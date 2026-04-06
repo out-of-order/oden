@@ -1,10 +1,37 @@
-use std::path::PathBuf;
+use std::{borrow::Cow, path::PathBuf};
 
-use gpui::{App, AppContext, Application, Entity, SharedString, WindowOptions};
+use anyhow::anyhow;
+use gpui::{
+    App, AppContext, Application, AssetSource, Entity, Result, SharedString, WindowOptions,
+};
 use gpui_component::{Root, Theme, ThemeRegistry};
+use rust_embed::RustEmbed;
+
+#[derive(RustEmbed)]
+#[folder = "./assets"]
+#[include = "icons/**/*.svg"]
+pub struct Assets;
+
+impl AssetSource for Assets {
+    fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
+        if path.is_empty() {
+            return Ok(None);
+        }
+        Self::get(path)
+            .map(|f| Some(f.data))
+            .ok_or_else(|| anyhow!("could not find asset at path \"{path}\""))
+    }
+
+    fn list(&self, path: &str) -> Result<Vec<SharedString>> {
+        Ok(Self::iter()
+            .filter_map(|p| p.starts_with(path).then(|| p.into()))
+            .collect())
+    }
+}
 
 use crate::{root::AppRoot, state::AppState, store::ItemStore};
 
+mod icons;
 mod models;
 mod root;
 mod state;
@@ -12,7 +39,7 @@ mod store;
 mod views;
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    Application::new().with_assets(Assets).run(|cx: &mut App| {
         gpui_component::init(cx);
         ItemStore::init(cx);
         setup_theme(cx);
@@ -30,7 +57,6 @@ fn main() {
 
 fn setup_theme(cx: &mut App) {
     let theme_name = SharedString::from("Tokyo Night");
-    // Load and watch themes from ./themes directory
     if let Err(err) = ThemeRegistry::watch_dir(PathBuf::from("./themes"), cx, move |cx| {
         if let Some(theme) = ThemeRegistry::global(cx).themes().get(&theme_name).cloned() {
             Theme::global_mut(cx).apply_config(&theme);
