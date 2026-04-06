@@ -1,4 +1,6 @@
+use anyhow::Context;
 use gpui::{Entity, ParentElement, Render, Styled, div};
+use gpui_component::ActiveTheme;
 
 use crate::state::AppState;
 
@@ -17,8 +19,9 @@ impl Render for AppRoot {
     fn render(
         &mut self,
         _window: &mut gpui::Window,
-        _cx: &mut gpui::Context<Self>,
+        cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
+        let theme = cx.theme();
         div()
             .flex()
             .flex_row()
@@ -26,6 +29,7 @@ impl Render for AppRoot {
             .w_full()
             .items_center()
             .justify_center()
+            .bg(theme.background)
             .child("Hello World")
     }
 }
