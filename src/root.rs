@@ -143,3 +143,57 @@ impl Render for AppRoot {
             .child(div().p_4().child(mode))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use gpui::{AppContext, TestAppContext, WindowHandle, WindowOptions};
+
+    use crate::{
+        actions,
+        root::AppRoot,
+        state::{AppMode, AppState},
+    };
+
+    fn setup(cx: &mut TestAppContext) -> (WindowHandle<AppRoot>, gpui::Entity<AppState>) {
+        cx.update(|cx| {
+            gpui_component::init(cx);
+            let window = cx
+                .open_window(WindowOptions::default(), |_window, cx| {
+                    let app_state = cx.new(|_| AppState::init());
+                    let root = cx.new(|cx| AppRoot::new(app_state, cx));
+                    root
+                })
+                .unwrap();
+            let app_state = window.root(cx).unwrap().read(cx).app_state.clone();
+            (window, app_state)
+        })
+    }
+
+    #[gpui::test]
+    fn test_icon_rail_navigation(cx: &mut TestAppContext) {
+        let (window, app_state) = setup(cx);
+
+        let cases: Vec<(Box<dyn gpui::Action>, AppMode)> = vec![
+            (Box::new(actions::SearchMode), AppMode::Search),
+            (Box::new(actions::GraphMode), AppMode::Graph),
+            (Box::new(actions::Settings), AppMode::Settings),
+            (Box::new(actions::ListMode), AppMode::List),
+        ];
+
+        for (action, expected_mode) in cases {
+            window
+                .update(cx, |root, window, cx| {
+                    root.focus.focus(window);
+                    window.dispatch_action(action, cx);
+                })
+                .unwrap();
+            cx.update(|cx| {
+                assert_eq!(
+                    app_state.read(cx).mode,
+                    expected_mode,
+                    "failed for {expected_mode}"
+                );
+            });
+        }
+    }
+}

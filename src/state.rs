@@ -20,7 +20,7 @@ impl AppState {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum AppMode {
     Search,
     List,

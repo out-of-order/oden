@@ -11,6 +11,23 @@ env:
   RUSTFLAGS: -D warnings
 
 jobs:
+  test: 
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y \
+            libssl-dev pkg-config \
+            libxcb-shape0-dev libxcb-xfixes0-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libvulkan-dev \
+            libgl1-mesa-dev libegl1-mesa-dev \
+            libfontconfig1-dev libwayland-dev
+      - run: cargo t
+
   fmt:
     name: Format
     runs-on: ubuntu-latest
