@@ -160,8 +160,7 @@ mod tests {
             let window = cx
                 .open_window(WindowOptions::default(), |_window, cx| {
                     let app_state = cx.new(|_| AppState::init());
-                    let root = cx.new(|cx| AppRoot::new(app_state, cx));
-                    root
+                    cx.new(|cx| AppRoot::new(app_state, cx))
                 })
                 .unwrap();
             let app_state = window.root(cx).unwrap().read(cx).app_state.clone();
