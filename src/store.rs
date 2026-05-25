@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use gpui::{App, Global};
 use gpui_component::link::Link;
 
+use crate::fixtures::mock_items;
 use crate::models::Item;
 
 pub struct ItemStore {
@@ -15,11 +16,19 @@ pub struct ItemStore {
 impl Global for ItemStore {}
 
 impl ItemStore {
+    pub fn items(&self) -> HashMap<uuid::Uuid, Item> {
+        self.items.clone()
+    }
     pub fn init(cx: &mut App) {
-        cx.set_global(ItemStore {
+        let mut store = ItemStore {
             items: HashMap::new(),
             links: Vec::new(),
-        });
+        };
+        #[cfg(debug_assertions)]
+        for item in mock_items() {
+            store.items.insert(item.id, item);
+        }
+        cx.set_global(store);
     }
 
     pub fn get(cx: &mut App) -> &Self {

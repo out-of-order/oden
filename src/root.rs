@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use gpui::{
-    Context, Entity, FocusHandle, InteractiveElement, IntoElement, ParentElement, Render, Styled,
-    Subscription, div, px,
+    AnyElement, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement,
+    ParentElement, Render, SharedString, Styled, Subscription, div, px,
 };
 use gpui_component::{
     ActiveTheme, Icon,
@@ -13,21 +13,28 @@ use crate::{
     actions::{self, GraphMode, ListMode, SearchMode, Settings},
     icons::IconName,
     state::{AppMode, AppState},
+    views::list::ListView,
 };
 
 pub struct AppRoot {
     pub app_state: Entity<AppState>,
+    pub list_view: Entity<ListView>,
     pub focus: FocusHandle,
     pub _state_sub: Subscription,
 }
 
 impl AppRoot {
-    pub fn new(app_state: Entity<AppState>, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        app_state: Entity<AppState>,
+        window: &mut gpui::Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         Self {
             _state_sub: cx.observe(&app_state, |_, _, cx| {
                 cx.notify();
             }),
             app_state,
+            list_view: cx.new(|cx| ListView::new(window, cx)),
             focus: cx.focus_handle(),
         }
     }
@@ -119,7 +126,7 @@ impl Render for AppRoot {
     ) -> impl gpui::IntoElement {
         let bg = cx.theme().background;
         let sidebar = self.render_sidebar(cx);
-        let mode = self.app_state.read(cx).mode.to_string();
+        let mode = self.app_state.read(cx).mode;
         div()
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _action: &ListMode, _window, cx| {
@@ -140,7 +147,16 @@ impl Render for AppRoot {
             .w_full()
             .bg(bg)
             .child(sidebar)
-            .child(div().p_4().child(mode))
+            .child(self.render_mode(mode))
+    }
+}
+
+impl AppRoot {
+    fn render_mode(&self, mode: AppMode) -> AnyElement {
+        match mode {
+            AppMode::List => self.list_view.clone().into_any_element(),
+            _ => SharedString::from(mode.to_string()).into_any_element(),
+        }
     }
 }
 
@@ -152,15 +168,17 @@ mod tests {
         actions,
         root::AppRoot,
         state::{AppMode, AppState},
+        store::ItemStore,
     };
 
     fn setup(cx: &mut TestAppContext) -> (WindowHandle<AppRoot>, gpui::Entity<AppState>) {
         cx.update(|cx| {
             gpui_component::init(cx);
+            ItemStore::init(cx);
             let window = cx
-                .open_window(WindowOptions::default(), |_window, cx| {
+                .open_window(WindowOptions::default(), |window, cx| {
                     let app_state = cx.new(|_| AppState::init());
-                    cx.new(|cx| AppRoot::new(app_state, cx))
+                    cx.new(|cx| AppRoot::new(app_state, window, cx))
                 })
                 .unwrap();
             let app_state = window.root(cx).unwrap().read(cx).app_state.clone();
