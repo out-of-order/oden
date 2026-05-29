@@ -32,6 +32,8 @@ impl AssetSource for Assets {
 use crate::{root::AppRoot, state::AppState, store::ItemStore};
 
 mod actions;
+#[cfg(debug_assertions)]
+mod fixtures;
 mod icons;
 mod models;
 mod root;
@@ -47,7 +49,7 @@ fn main() {
         cx.spawn(async move |cx| {
             cx.open_window(WindowOptions::default(), |window, cx| {
                 let app_state: Entity<AppState> = cx.new(|_| AppState::init());
-                let view = cx.new(|cx| AppRoot::new(app_state, cx));
+                let view = cx.new(|cx| AppRoot::new(app_state, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             })
             .unwrap();
@@ -57,7 +59,7 @@ fn main() {
 }
 
 fn setup_theme(cx: &mut App) {
-    let theme_name = SharedString::from("Tokyo Night");
+    let theme_name = SharedString::from("Gruvbox Dark");
     if let Err(err) = ThemeRegistry::watch_dir(PathBuf::from("./themes"), cx, move |cx| {
         if let Some(theme) = ThemeRegistry::global(cx).themes().get(&theme_name).cloned() {
             Theme::global_mut(cx).apply_config(&theme);

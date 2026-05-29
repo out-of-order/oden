@@ -3,6 +3,7 @@
 use chrono::{DateTime, Utc};
 use gpui::SharedString;
 
+#[derive(Clone)]
 pub struct Item {
     pub id: uuid::Uuid,
     pub name: SharedString,
@@ -10,14 +11,15 @@ pub struct Item {
     pub kind: ItemKind,
     pub tags: Vec<SharedString>,
     pub language: Option<SharedString>,
-    pub create_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub modified_at: DateTime<Utc>,
 }
 
+#[derive(Clone)]
 pub enum ItemKind {
     Note,
     Snippet,
-    Code,
+    Command,
 }
 
 pub struct Link {
