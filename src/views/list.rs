@@ -71,7 +71,7 @@ struct ItemListDelegate {
 fn preview_content(s: SharedString) -> SharedString {
     let truncated = &s[..s.floor_char_boundary(50.min(s.len()))];
     let truncated: Vec<_> = truncated.lines().filter(|line| !line.is_empty()).collect();
-    truncated.join("\n").into()
+    truncated.join(" ").into()
 }
 
 impl ListDelegate for ItemListDelegate {
@@ -92,7 +92,7 @@ impl ListDelegate for ItemListDelegate {
         let border_color = theme.border;
         self.items.get(ix.row).map(|item| {
             ListItem::new(ix)
-                .h_40()
+                .h_32()
                 .overflow_hidden()
                 .p_2()
                 .flex()
