@@ -9,9 +9,10 @@ use gpui_component::{
     button::{Button, ButtonVariants},
     label::Label,
 };
+use uuid::Uuid;
 
 use crate::{
-    actions::{self, GraphMode, ListMode, SearchMode, Settings},
+    actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
     icons::IconName,
     state::{AppMode, AppState},
     views::list::ListView,
@@ -37,7 +38,7 @@ impl AppRoot {
                 cx.notify();
             }),
             app_state,
-            list_view: cx.new(|cx| ListView::new(window, cx)),
+            list_view: cx.new(|cx| ListView::new(window, cx, cx.focus_handle())),
             focus: cx.focus_handle(),
         }
     }
@@ -119,6 +120,15 @@ impl AppRoot {
             }
         })
     }
+
+    fn update_selected_id(&mut self, selected_id: Uuid, cx: &mut Context<Self>) {
+        self.app_state.update(cx, |app_state, cx| {
+            if app_state.selected_id != Some(selected_id) {
+                app_state.selected_id = Some(selected_id);
+                cx.notify();
+            }
+        })
+    }
 }
 
 impl Render for AppRoot {
@@ -144,6 +154,9 @@ impl Render for AppRoot {
             }))
             .on_action(cx.listener(|this, _action: &Settings, _window, cx| {
                 this.update_mode(AppMode::Settings, cx)
+            }))
+            .on_action(cx.listener(|this, action: &SelectItem, _window, cx| {
+                this.update_selected_id(action.selected_id, cx);
             }))
             .flex()
             .flex_col()
@@ -179,29 +192,9 @@ impl AppRoot {
 
 #[cfg(test)]
 mod tests {
-    use gpui::{AppContext, TestAppContext, WindowHandle, WindowOptions};
+    use gpui::TestAppContext;
 
-    use crate::{
-        actions,
-        root::AppRoot,
-        state::{AppMode, AppState},
-        store::ItemStore,
-    };
-
-    fn setup(cx: &mut TestAppContext) -> (WindowHandle<AppRoot>, gpui::Entity<AppState>) {
-        cx.update(|cx| {
-            gpui_component::init(cx);
-            ItemStore::init(cx);
-            let window = cx
-                .open_window(WindowOptions::default(), |window, cx| {
-                    let app_state = cx.new(|_| AppState::init());
-                    cx.new(|cx| AppRoot::new(app_state, window, cx))
-                })
-                .unwrap();
-            let app_state = window.root(cx).unwrap().read(cx).app_state.clone();
-            (window, app_state)
-        })
-    }
+    use crate::{actions, state::AppMode, testutils::setup};
 
     #[gpui::test]
     fn test_icon_rail_navigation(cx: &mut TestAppContext) {

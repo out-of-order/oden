@@ -5,12 +5,13 @@ edition = "2024"
 
 [dependencies]
 gpui = "0.2.2"
-gpui-component = "0.5.1"
+gpui-component = { version="0.5.1", features=["tree-sitter-languages"] }
 anyhow = "1"
 rust-embed = "8"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+schemars = { version = "1.2.1", features = ["uuid1"] }
 
 [dev-dependencies]
 gpui = { version = "0.2.2", features = ["test-support"] }
-

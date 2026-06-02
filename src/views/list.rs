@@ -1,6 +1,6 @@
 use gpui::{
-    AppContext, Context, Entity, ParentElement, Render, SharedString, Styled, Subscription, Window,
-    div, px,
+    AppContext, Context, Entity, FocusHandle, InteractiveElement, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, div, px,
 };
 use gpui_component::{
     ActiveTheme, Icon, IndexPath, Sizable, StyledExt,
@@ -9,17 +9,19 @@ use gpui_component::{
     list::{List, ListDelegate, ListItem, ListState},
 };
 
-use crate::models::Item;
-use crate::{ItemStore, icons::IconName};
+use crate::{ItemStore, actions::SelectItem, icons::IconName};
+use crate::{models::Item, views::editor::EditorView};
 
 pub struct ListView {
     input_state: Entity<InputState>,
+    editor: Entity<EditorView>,
     _input_sub: Subscription,
+    focus_handle: FocusHandle,
     list_state: Entity<ListState<ItemListDelegate>>,
 }
 
 impl ListView {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>, focus_handle: FocusHandle) -> Self {
         let input_state =
             cx.new(|cx| InputState::new(window, cx).placeholder("Search for anything..."));
         let items: Vec<Item> = ItemStore::get(cx).items().values().cloned().collect();
@@ -27,6 +29,7 @@ impl ListView {
             items: items.clone(),
             all_items: items.clone(),
             selected_index: None,
+            focus: focus_handle.clone(),
         };
         let list_state = cx.new(|cx| ListState::new(delegate, window, cx));
         let list_state_clone = list_state.clone();
@@ -54,9 +57,12 @@ impl ListView {
                 }
             },
         );
+        let editor = cx.new(|cx| EditorView::new(cx, window));
         Self {
             input_state,
             list_state,
+            editor,
+            focus_handle,
             _input_sub: _subscription,
         }
     }
@@ -66,6 +72,7 @@ struct ItemListDelegate {
     items: Vec<Item>,
     all_items: Vec<Item>,
     selected_index: Option<IndexPath>,
+    focus: FocusHandle,
 }
 
 fn preview_content(s: SharedString) -> SharedString {
@@ -90,7 +97,9 @@ impl ListDelegate for ItemListDelegate {
         let muted_color = theme.muted_foreground;
         let date_color = theme.blue;
         let border_color = theme.border;
+        let focus = self.focus.clone();
         self.items.get(ix.row).map(|item| {
+            let selected_id = item.id;
             ListItem::new(ix)
                 .h_32()
                 .overflow_hidden()
@@ -106,6 +115,11 @@ impl ListDelegate for ItemListDelegate {
                         .font_thin(),
                 )
                 .child(Label::new(preview_content(item.content.clone())).text_color(muted_color))
+                .on_click(move |_event, window, cx| {
+                    focus.focus(window);
+                    let select_item_action = SelectItem { selected_id };
+                    window.dispatch_action(Box::new(select_item_action), cx);
+                })
                 .selected(Some(ix) == self.selected_index)
         })
     }
@@ -130,35 +144,71 @@ impl Render for ListView {
         let border_color = theme.border;
         let muted_color = theme.muted_foreground;
         div()
-            .w(px(224.0))
-            .border_r(px(1.0))
-            .border_color(border_color)
+            .track_focus(&self.focus_handle)
+            .w_full()
+            .h_full()
+            .flex_row()
             .flex()
-            .flex_col()
             .child(
                 div()
-                    .w_full()
-                    .flex()
-                    .flex_row()
-                    .justify_center()
-                    .items_center()
-                    .border_b(px(1.0))
+                    .w_1_4()
+                    .border_r(px(1.0))
                     .border_color(border_color)
-                    .p_2()
+                    .flex()
+                    .flex_col()
                     .child(
                         div()
-                            .flex()
-                            .flex_col()
-                            .items_center()
-                            .justify_center()
-                            .gap(px(5.0))
                             .w_full()
-                            .child(Label::new(SharedString::from("All Items")).font_bold())
-                            .child(Input::new(&self.input_state).prefix(
-                                Icon::new(IconName::Search).small().text_color(muted_color),
-                            )),
-                    ),
+                            .flex()
+                            .flex_row()
+                            .justify_center()
+                            .items_center()
+                            .border_b(px(1.0))
+                            .border_color(border_color)
+                            .p_2()
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .items_center()
+                                    .justify_center()
+                                    .gap(px(5.0))
+                                    .w_full()
+                                    .child(Label::new(SharedString::from("All Items")).font_bold())
+                                    .child(Input::new(&self.input_state).prefix(
+                                        Icon::new(IconName::Search).small().text_color(muted_color),
+                                    )),
+                            ),
+                    )
+                    .child(List::new(&self.list_state).flex().flex_col().gap_5()),
             )
-            .child(List::new(&self.list_state).flex().flex_col().gap_5())
+            .child(self.editor.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::actions::SelectItem;
+    use crate::testutils::setup;
+    use gpui::TestAppContext;
+    use uuid::Uuid;
+
+    #[gpui::test]
+    fn test_list_items_navigation(cx: &mut TestAppContext) {
+        let (window, app_state) = setup(cx);
+        let uuid = Uuid::new_v4();
+        window
+            .update(cx, |root, window, cx| {
+                root.focus.focus(window);
+                window.dispatch_action(Box::new(SelectItem { selected_id: uuid }), cx);
+            })
+            .unwrap();
+        cx.update(|cx| {
+            assert_eq!(
+                app_state.read(cx).selected_id.unwrap(),
+                uuid,
+                "id selection failed"
+            )
+        })
     }
 }

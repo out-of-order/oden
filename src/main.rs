@@ -39,10 +39,15 @@ mod models;
 mod root;
 mod state;
 mod store;
+#[cfg(test)]
+mod testutils;
 mod views;
 
 fn main() {
     Application::new().with_assets(Assets).run(|cx: &mut App| {
+        let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(
+            include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf").as_slice(),
+        )]);
         gpui_component::init(cx);
         ItemStore::init(cx);
         setup_theme(cx);
