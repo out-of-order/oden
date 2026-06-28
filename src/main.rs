@@ -29,7 +29,8 @@ impl AssetSource for Assets {
     }
 }
 
-use crate::{root::AppRoot, state::AppState, store::ItemStore};
+use crate::state::{AppMode, SelectedIdState};
+use crate::{root::AppRoot, store::ItemStore};
 
 mod actions;
 #[cfg(debug_assertions)]
@@ -57,8 +58,10 @@ fn main() {
         };
         cx.spawn(async move |cx| {
             cx.open_window(window_options, |window, cx| {
-                let app_state: Entity<AppState> = cx.new(|_| AppState::init());
-                let view = cx.new(|cx| AppRoot::new(app_state, window, cx));
+                let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
+                let selected_id_state: Entity<SelectedIdState> =
+                    cx.new(|_| SelectedIdState::init());
+                let view = cx.new(|cx| AppRoot::new(app_mode, selected_id_state, window, cx));
                 cx.new(|cx| Root::new(view, window, cx))
             })
             .unwrap();

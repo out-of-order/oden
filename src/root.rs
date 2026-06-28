@@ -14,31 +14,35 @@ use uuid::Uuid;
 use crate::{
     actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
     icons::IconName,
-    state::{AppMode, AppState},
+    state::{AppMode, SelectedIdState},
     views::list::ListView,
 };
 
 pub struct AppRoot {
-    pub app_state: Entity<AppState>,
-    pub list_view: Entity<ListView>,
-    pub focus: FocusHandle,
-    pub _state_sub: Subscription,
+    pub(crate) app_mode: Entity<AppMode>,
+    pub(crate) selected_id_state: Entity<SelectedIdState>,
+    pub(crate) list_view: Entity<ListView>,
+    pub(crate) focus: FocusHandle,
+    pub(crate) _state_sub: Subscription,
 }
 
 const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 impl AppRoot {
     pub fn new(
-        app_state: Entity<AppState>,
+        app_mode: Entity<AppMode>,
+        selected_id_state: Entity<SelectedIdState>,
         window: &mut gpui::Window,
         cx: &mut Context<Self>,
     ) -> Self {
         Self {
-            _state_sub: cx.observe(&app_state, |_, _, cx| {
+            _state_sub: cx.observe(&app_mode, |_, _, cx| {
                 cx.notify();
             }),
-            app_state,
-            list_view: cx.new(|cx| ListView::new(window, cx, cx.focus_handle())),
+            app_mode: app_mode.clone(),
+            list_view: cx
+                .new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone())),
+            selected_id_state,
             focus: cx.focus_handle(),
         }
     }
@@ -113,18 +117,18 @@ impl AppRoot {
     }
 
     fn update_mode(&mut self, mode: AppMode, cx: &mut Context<Self>) {
-        self.app_state.update(cx, |app_state, cx| {
-            if app_state.mode != mode {
-                app_state.mode = mode;
+        self.app_mode.update(cx, |app_mode, cx| {
+            if *app_mode != mode {
+                *app_mode = mode;
                 cx.notify();
             }
         })
     }
 
     fn update_selected_id(&mut self, selected_id: Uuid, cx: &mut Context<Self>) {
-        self.app_state.update(cx, |app_state, cx| {
-            if app_state.selected_id != Some(selected_id) {
-                app_state.selected_id = Some(selected_id);
+        self.selected_id_state.update(cx, |selected_id_state, cx| {
+            if selected_id_state.selected_id != Some(selected_id) {
+                selected_id_state.selected_id = Some(selected_id);
                 cx.notify();
             }
         })
@@ -140,7 +144,7 @@ impl Render for AppRoot {
         let bg = cx.theme().background;
         let muted = cx.theme().muted_foreground;
         let sidebar = self.render_sidebar(cx);
-        let mode = self.app_state.read(cx).mode;
+        let mode = self.app_mode.read(cx);
         div()
             .track_focus(&self.focus)
             .on_action(cx.listener(|this, _action: &ListMode, _window, cx| {
@@ -176,7 +180,7 @@ impl Render for AppRoot {
                     .w_full()
                     .bg(bg)
                     .child(sidebar)
-                    .child(self.render_mode(mode)),
+                    .child(self.render_mode(*mode)),
             )
     }
 }
@@ -198,7 +202,7 @@ mod tests {
 
     #[gpui::test]
     fn test_icon_rail_navigation(cx: &mut TestAppContext) {
-        let (window, app_state) = setup(cx);
+        let (window, app_mode_state, _selected_id_state) = setup(cx);
 
         let cases: Vec<(Box<dyn gpui::Action>, AppMode)> = vec![
             (Box::new(actions::SearchMode), AppMode::Search),
@@ -216,7 +220,7 @@ mod tests {
                 .unwrap();
             cx.update(|cx| {
                 assert_eq!(
-                    app_state.read(cx).mode,
+                    *app_mode_state.read(cx),
                     expected_mode,
                     "failed for {expected_mode}"
                 );

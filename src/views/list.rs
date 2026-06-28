@@ -9,19 +9,24 @@ use gpui_component::{
     list::{List, ListDelegate, ListItem, ListState},
 };
 
-use crate::{ItemStore, actions::SelectItem, icons::IconName};
+use crate::{ItemStore, actions::SelectItem, icons::IconName, state::SelectedIdState};
 use crate::{models::Item, views::editor::EditorView};
 
 pub struct ListView {
-    input_state: Entity<InputState>,
-    editor: Entity<EditorView>,
-    _input_sub: Subscription,
-    focus_handle: FocusHandle,
+    pub(crate) input_state: Entity<InputState>,
+    pub(crate) editor: Entity<EditorView>,
+    pub(crate) _input_sub: Subscription,
+    pub(crate) focus_handle: FocusHandle,
     list_state: Entity<ListState<ItemListDelegate>>,
 }
 
 impl ListView {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>, focus_handle: FocusHandle) -> Self {
+    pub fn new(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        focus_handle: FocusHandle,
+        selected_id_state: Entity<SelectedIdState>,
+    ) -> Self {
         let input_state =
             cx.new(|cx| InputState::new(window, cx).placeholder("Search for anything..."));
         let items: Vec<Item> = ItemStore::get(cx).items().values().cloned().collect();
@@ -57,7 +62,7 @@ impl ListView {
                 }
             },
         );
-        let editor = cx.new(|cx| EditorView::new(cx, window));
+        let editor = cx.new(|cx| EditorView::new(cx, window, selected_id_state.clone()));
         Self {
             input_state,
             list_state,
@@ -195,7 +200,7 @@ mod tests {
 
     #[gpui::test]
     fn test_list_items_navigation(cx: &mut TestAppContext) {
-        let (window, app_state) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         let uuid = Uuid::new_v4();
         window
             .update(cx, |root, window, cx| {
@@ -205,7 +210,7 @@ mod tests {
             .unwrap();
         cx.update(|cx| {
             assert_eq!(
-                app_state.read(cx).selected_id.unwrap(),
+                selected_id_state.read(cx).selected_id.unwrap(),
                 uuid,
                 "id selection failed"
             )

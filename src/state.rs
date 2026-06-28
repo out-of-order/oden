@@ -2,30 +2,22 @@
 
 use uuid::Uuid;
 
-pub struct AppState {
-    pub mode: AppMode,
-    pub selected_id: Option<Uuid>,
-}
-
-impl AppState {
-    pub fn new(mode: AppMode, selected_id: Option<Uuid>) -> Self {
-        Self { mode, selected_id }
-    }
-
-    pub fn init() -> Self {
-        Self {
-            mode: AppMode::List,
-            selected_id: None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum AppMode {
     Search,
     List,
     Graph,
     Settings,
+}
+
+pub struct SelectedIdState {
+    pub selected_id: Option<Uuid>,
+}
+
+impl SelectedIdState {
+    pub fn init() -> Self {
+        Self { selected_id: None }
+    }
 }
 
 impl std::fmt::Display for AppMode {
