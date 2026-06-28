@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/out-of-order/Oden/compare/v0.3.0...v0.4.0) (2026-06-28)
+
+
+### Features
+
+* update editor content based on selected index. ([3512a99](https://github.com/out-of-order/Oden/commit/3512a99afbb91f0c2d5cd8d72a9b0becfa42744d))
+* update editor content based on selected index. ([81a9776](https://github.com/out-of-order/Oden/commit/81a977602f23ab5980bd356410a1ed2cd915ab10))
+
 ## [0.3.0](https://github.com/out-of-order/Oden/compare/v0.2.0...v0.3.0) (2026-06-09)
 
 
