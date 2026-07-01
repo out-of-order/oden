@@ -1,3 +1,9 @@
 [workspace]
-members = ["crates/oden-app", "crates/oden-server"]
+members = ["crates/oden-app", "crates/oden-core"]
 resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }

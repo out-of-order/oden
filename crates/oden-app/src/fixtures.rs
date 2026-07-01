@@ -1,8 +1,9 @@
-use crate::models::{Item, ItemKind};
+use crate::models::Item;
 use chrono::Utc;
+use oden_core::entities::item::ItemKind;
 use uuid::Uuid;
 
-#[cfg(debug_assertions)]
+#[cfg(any(test, debug_assertions))]
 pub fn mock_items() -> Vec<Item> {
     vec![
         Item {

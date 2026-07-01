@@ -13,7 +13,7 @@ pub fn setup(
 ) {
     cx.update(|cx| {
         gpui_component::init(cx);
-        ItemStore::init(cx);
+        ItemStore::mock_store(cx);
         let window = cx
             .open_window(WindowOptions::default(), |window, cx| {
                 let selected_id_state: Entity<SelectedIdState> =

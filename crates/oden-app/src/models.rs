@@ -2,6 +2,8 @@
 
 use chrono::{DateTime, Utc};
 use gpui::SharedString;
+use oden_core::entities::item::{self, ItemKind};
+use serde_json::Value;
 
 #[derive(Clone)]
 pub struct Item {
@@ -15,11 +17,32 @@ pub struct Item {
     pub modified_at: DateTime<Utc>,
 }
 
-#[derive(Clone)]
-pub enum ItemKind {
-    Note,
-    Snippet,
-    Command,
+impl Item {
+    pub fn from(item: item::Model) -> Self {
+        Self {
+            id: item.id,
+            name: item.name.into(),
+            content: item.content.into(),
+            kind: item.kind,
+            language: item.language.map(SharedString::from),
+            tags: tags_from_json(item.tags),
+            created_at: item.created_at,
+            modified_at: item.modified_at,
+        }
+    }
+}
+
+fn tags_from_json(tags: Value) -> Vec<SharedString> {
+    if let Value::Array(values) = tags {
+        return values
+            .into_iter()
+            .filter_map(|v| match v {
+                Value::String(s) => Some(SharedString::from(s)),
+                _ => None,
+            })
+            .collect();
+    }
+    Vec::new()
 }
 
 pub struct Link {

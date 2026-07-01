@@ -2,12 +2,14 @@
 
 use std::collections::HashMap;
 
-use gpui::{App, Global};
+use gpui::{App, AsyncApp, Global};
 use gpui_component::link::Link;
+use oden_core::entities::item;
+use oden_core::repository::Repository;
 
+#[cfg(any(test, debug_assertions))]
 use crate::fixtures::mock_items;
 use crate::models::Item;
-
 pub struct ItemStore {
     items: HashMap<uuid::Uuid, Item>,
     links: Vec<Link>,
@@ -19,16 +21,31 @@ impl ItemStore {
     pub fn items(&self) -> HashMap<uuid::Uuid, Item> {
         self.items.clone()
     }
-    pub fn init(cx: &mut App) {
+
+    #[cfg(any(debug_assertions, test))]
+    pub fn mock_store(cx: &mut App) {
         let mut store = ItemStore {
             items: HashMap::new(),
             links: Vec::new(),
         };
-        #[cfg(debug_assertions)]
         for item in mock_items() {
             store.items.insert(item.id, item);
         }
         cx.set_global(store);
+    }
+
+    pub async fn init(cx: &mut AsyncApp, repository: &Repository) -> anyhow::Result<()> {
+        let items: Vec<item::Model> = repository.find_all::<item::Entity>().await?;
+        cx.update(move |cx| {
+            let mut store = ItemStore {
+                items: HashMap::new(),
+                links: Vec::new(),
+            };
+            for item in items {
+                store.items.insert(item.id, Item::from(item));
+            }
+            cx.set_global(store);
+        })
     }
 
     pub fn get(cx: &mut App) -> &Self {
