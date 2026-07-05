@@ -1,0 +1,12 @@
+{
+  "packages": {
+    "crates/oden-core": {
+      "release-type": "rust",
+      "component": "oden-core"
+    },
+    "crates/oden-app": {
+      "release-type": "rust",
+      "component": "oden"
+    }
+  }
+}
