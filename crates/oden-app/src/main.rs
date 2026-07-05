@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::anyhow;
@@ -5,6 +6,7 @@ use gpui::{
     App, AppContext, Application, AssetSource, Entity, Result, SharedString, WindowOptions,
 };
 use gpui_component::{Root, Theme, ThemeRegistry, TitleBar};
+use oden_core::repository::Repository;
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -31,6 +33,7 @@ impl AssetSource for Assets {
 
 use crate::state::{AppMode, SelectedIdState};
 use crate::{root::AppRoot, store::ItemStore};
+use oden_core::db::setup_database;
 
 mod actions;
 #[cfg(debug_assertions)]
@@ -44,19 +47,25 @@ mod store;
 mod testutils;
 mod views;
 
-fn main() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let db = setup_database().await?;
     Application::new().with_assets(Assets).run(|cx: &mut App| {
         let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(
             include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf").as_slice(),
         )]);
         gpui_component::init(cx);
-        ItemStore::init(cx);
         setup_theme(cx);
         let window_options = WindowOptions {
             titlebar: Some(TitleBar::title_bar_options()),
             ..Default::default()
         };
         cx.spawn(async move |cx| {
+            let repository = Arc::new(Repository::new(db));
+            if let Err(err) = ItemStore::init(cx, &repository).await {
+                eprintln!("failed to initialize ItemStore: {err:?}");
+                return;
+            }
             cx.open_window(window_options, |window, cx| {
                 let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
                 let selected_id_state: Entity<SelectedIdState> =
@@ -68,10 +77,11 @@ fn main() {
         })
         .detach();
     });
+    Ok(())
 }
 
 fn setup_theme(cx: &mut App) {
-    let theme_name = SharedString::from("Gruvbox Dark");
+    let theme_name = SharedString::from("Everforest Dark");
     if let Err(err) = ThemeRegistry::watch_dir(PathBuf::from("./themes"), cx, move |cx| {
         if let Some(theme) = ThemeRegistry::global(cx).themes().get(&theme_name).cloned() {
             Theme::global_mut(cx).apply_config(&theme);
