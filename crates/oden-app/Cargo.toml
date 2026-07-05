@@ -12,8 +12,10 @@ serde_json = "1"
 schemars = { version = "1.2.1", features = ["uuid1"] }
 oden-core = { path = "../oden-core"}
 anyhow.workspace= true
+async-trait.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 [dev-dependencies]
 gpui = { version = "0.2.2", features = ["test-support"] }
+sea-orm = { version = "2.0.0-rc", default-features = false }

@@ -84,7 +84,7 @@ mod tests {
             .update(cx, |root, _window, cx| {
                 root.list_view
                     .read(cx)
-                    .editor
+                    .editor()
                     .read(cx)
                     .input_state
                     .read(cx)

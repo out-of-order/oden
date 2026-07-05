@@ -6,7 +6,7 @@ use gpui::{
     App, AppContext, Application, AssetSource, Entity, Result, SharedString, WindowOptions,
 };
 use gpui_component::{Root, Theme, ThemeRegistry, TitleBar};
-use oden_core::repository::Repository;
+use oden_core::repository::ItemRepository;
 use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
@@ -31,6 +31,7 @@ impl AssetSource for Assets {
     }
 }
 
+use crate::repository::AppRepository;
 use crate::state::{AppMode, SelectedIdState};
 use crate::{root::AppRoot, store::ItemStore};
 use oden_core::db::setup_database;
@@ -40,6 +41,7 @@ mod actions;
 mod fixtures;
 mod icons;
 mod models;
+mod repository;
 mod root;
 mod state;
 mod store;
@@ -61,11 +63,12 @@ async fn main() -> anyhow::Result<()> {
             ..Default::default()
         };
         cx.spawn(async move |cx| {
-            let repository = Arc::new(Repository::new(db));
+            let repository = Arc::new(ItemRepository::new(db));
             if let Err(err) = ItemStore::init(cx, &repository).await {
                 eprintln!("failed to initialize ItemStore: {err:?}");
                 return;
             }
+            AppRepository::init(cx, repository);
             cx.open_window(window_options, |window, cx| {
                 let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
                 let selected_id_state: Entity<SelectedIdState> =

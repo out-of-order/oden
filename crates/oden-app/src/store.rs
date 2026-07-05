@@ -5,13 +5,13 @@ use std::collections::HashMap;
 use gpui::{App, AsyncApp, Global};
 use gpui_component::link::Link;
 use oden_core::entities::item;
-use oden_core::repository::Repository;
+use oden_core::repository::{ItemRepository, ItemRepositoryTrait};
 
 #[cfg(any(test, debug_assertions))]
 use crate::fixtures::mock_items;
 use crate::models::Item;
 pub struct ItemStore {
-    items: HashMap<uuid::Uuid, Item>,
+    pub items: HashMap<uuid::Uuid, Item>,
     links: Vec<Link>,
 }
 
@@ -34,8 +34,8 @@ impl ItemStore {
         cx.set_global(store);
     }
 
-    pub async fn init(cx: &mut AsyncApp, repository: &Repository) -> anyhow::Result<()> {
-        let items: Vec<item::Model> = repository.find_all::<item::Entity>().await?;
+    pub async fn init(cx: &mut AsyncApp, repository: &ItemRepository) -> anyhow::Result<()> {
+        let items: Vec<item::Model> = repository.find_all().await?;
         cx.update(move |cx| {
             let mut store = ItemStore {
                 items: HashMap::new(),

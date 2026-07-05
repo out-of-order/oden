@@ -10,6 +10,7 @@ pub enum IconName {
     Minimize,
     Restore,
     Close,
+    Pencil,
 }
 
 impl IconNamed for IconName {
@@ -22,6 +23,7 @@ impl IconNamed for IconName {
             IconName::Minimize => "icons/window-minimize.svg",
             IconName::Restore => "icons/window-restore.svg",
             IconName::Close => "icons/window-close.svg",
+            IconName::Pencil => "icons/pencil.svg",
         }
         .into()
     }

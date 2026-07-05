@@ -4603,15 +4603,17 @@ dependencies = [
 
 [[package]]
 name = "oden"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "gpui",
  "gpui-component",
  "oden-core",
  "rust-embed",
  "schemars",
+ "sea-orm",
  "serde",
  "serde_json",
  "tokio",
@@ -4620,9 +4622,10 @@ dependencies = [
 
 [[package]]
 name = "oden-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "directories",
  "sea-orm",
