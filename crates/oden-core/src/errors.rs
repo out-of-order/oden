@@ -1,6 +1,5 @@
 use sea_orm::DbErr;
 use thiserror::Error;
-
 #[derive(Debug, Error)]
 pub enum DbError {
     #[error("could not determine app data directory")]

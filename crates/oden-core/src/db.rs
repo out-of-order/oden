@@ -28,9 +28,7 @@ fn get_db_path() -> Result<PathBuf> {
 #[cfg(debug_assertions)]
 // seeds the local database with mock data in debug mode.
 async fn seed_data_db(db: &DatabaseConnection) -> Result<()> {
-    if item::Entity::find().one(db).await?.is_some() {
-        return Ok(());
-    }
+    item::Entity::delete_many().exec(db).await?;
     let now = Utc::now();
     let rows = vec![
         item::ActiveModel {

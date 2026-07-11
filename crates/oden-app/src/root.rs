@@ -5,28 +5,27 @@ use gpui::{
     ParentElement, Render, SharedString, Styled, Subscription, div, px,
 };
 use gpui_component::{
-    ActiveTheme, Icon, TitleBar,
+    ActiveTheme, Icon,
     button::{Button, ButtonVariants},
-    label::Label,
 };
 use uuid::Uuid;
 
 use crate::{
     actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
+    appstatus::AppStatus,
     icons::IconName,
     state::{AppMode, SelectedIdState},
-    views::list::ListView,
+    views::{list::ListView, titlebar::Titlebar},
 };
 
 pub struct AppRoot {
     pub(crate) app_mode: Entity<AppMode>,
     pub(crate) selected_id_state: Entity<SelectedIdState>,
+    pub(crate) titlebar: Entity<Titlebar>,
     pub(crate) list_view: Entity<ListView>,
     pub(crate) focus: FocusHandle,
     pub(crate) _state_sub: Subscription,
 }
-
-const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 
 impl AppRoot {
     pub fn new(
@@ -35,13 +34,22 @@ impl AppRoot {
         window: &mut gpui::Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let status_entity = cx.new(|_| AppStatus::init());
         Self {
             _state_sub: cx.observe(&app_mode, |_, _, cx| {
                 cx.notify();
             }),
             app_mode: app_mode.clone(),
-            list_view: cx
-                .new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone())),
+            list_view: cx.new(|cx| {
+                ListView::new(
+                    window,
+                    cx,
+                    cx.focus_handle(),
+                    selected_id_state.clone(),
+                    status_entity.clone(),
+                )
+            }),
+            titlebar: cx.new(|cx| Titlebar::new(cx, window, status_entity)),
             selected_id_state,
             focus: cx.focus_handle(),
         }
@@ -142,7 +150,6 @@ impl Render for AppRoot {
         cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
         let bg = cx.theme().background;
-        let muted = cx.theme().muted_foreground;
         let sidebar = self.render_sidebar(cx);
         let mode = self.app_mode.read(cx);
         div()
@@ -167,11 +174,7 @@ impl Render for AppRoot {
             .h_full()
             .w_full()
             .bg(bg)
-            .child(
-                TitleBar::new()
-                    .child("Oden")
-                    .child(Label::new(APP_VERSION).text_color(muted)),
-            )
+            .child(self.titlebar.clone())
             .child(
                 div()
                     .flex()
