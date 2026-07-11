@@ -17,6 +17,7 @@ use oden_core::repository::ItemRepositoryTrait;
 use crate::{
     ItemStore,
     actions::{self, NewItem, SelectItem},
+    appstatus::{AppOperation, AppStatus, Issue},
     icons::IconName,
     repository::AppRepository,
     state::SelectedIdState,
@@ -25,7 +26,7 @@ use crate::{models::Item, views::editor::EditorView};
 
 pub(crate) struct ListView {
     _subscriptions: ListSubscriptions,
-    focus_handle: FocusHandle,
+    pub(crate) focus_handle: FocusHandle,
     entities: ListEntities,
 }
 
@@ -35,6 +36,7 @@ struct ListEntities {
     editor: Entity<EditorView>,
     list_state: Entity<ListState<ItemListDelegate>>,
     selected_id_state: Entity<SelectedIdState>,
+    app_status_entity: Entity<AppStatus>,
 }
 
 impl ListView {
@@ -43,9 +45,15 @@ impl ListView {
         cx: &mut Context<Self>,
         focus_handle: FocusHandle,
         selected_id_state: Entity<SelectedIdState>,
+        app_status_entity: Entity<AppStatus>,
     ) -> Self {
-        let entities =
-            Self::build_entities(window, cx, focus_handle.clone(), selected_id_state.clone());
+        let entities = Self::build_entities(
+            window,
+            cx,
+            focus_handle.clone(),
+            selected_id_state,
+            app_status_entity,
+        );
         let subscriptions: ListSubscriptions =
             Self::wire_subscriptions(window, cx, entities.clone());
         Self {
@@ -65,6 +73,7 @@ impl ListView {
         cx: &mut Context<Self>,
         focus_handle: FocusHandle,
         selected_id_state: Entity<SelectedIdState>,
+        app_status_entity: Entity<AppStatus>,
     ) -> ListEntities {
         let input_state = Self::build_input_state(window, cx);
         let list_state = Self::build_list_state(window, cx, focus_handle.clone());
@@ -74,6 +83,7 @@ impl ListView {
             editor,
             list_state,
             selected_id_state,
+            app_status_entity,
         }
     }
 
@@ -85,7 +95,7 @@ impl ListView {
         let model = repository.as_ref().create_item().await?;
         let item = Item::from(model);
         let item_id = item.id;
-        let _ = cx.update(|cx| {
+        cx.update(|cx| {
             cx.update_global::<ItemStore, _>(|store, _app| {
                 store.items.insert(item_id, item);
             });
@@ -93,7 +103,7 @@ impl ListView {
                 state.selected_id = Some(item_id);
                 cx.notify();
             });
-        });
+        })?;
         Ok(())
     }
 
@@ -221,12 +231,7 @@ impl ItemListDelegate {
         let mut visible: Vec<Item> = self
             .all_items
             .iter()
-            .filter(|item| {
-                item.name
-                    .to_string()
-                    .to_lowercase()
-                    .contains(&query.to_string().to_lowercase())
-            })
+            .filter(|item| item.name.to_string().to_lowercase().contains(query))
             .cloned()
             .collect();
         visible.sort_by_key(|i| i.name.to_lowercase());
@@ -301,10 +306,17 @@ impl Render for ListView {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
                 let selected_id_state = this.entities.selected_id_state.clone();
+                let app_status_entity = this.entities.app_status_entity.clone();
                 let repository = cx.global::<AppRepository>().0.clone();
                 cx.spawn(async move |_this, cx| {
                     if let Err(err) = Self::add_empty_item(cx, repository, selected_id_state).await
                     {
+                        let _ = app_status_entity.update(cx, |state, cx| {
+                            let new_issue =
+                                Issue::new(AppOperation::CreateNewItem, err.to_string());
+                            state.issues.push(new_issue);
+                            cx.notify();
+                        });
                         eprintln!("failed to add item: {err}");
                     }
                 })
@@ -353,7 +365,7 @@ impl Render for ListView {
                                                     .font_bold(),
                                             )
                                             .child(
-                                                Button::new("edit")
+                                                Button::new("new-item")
                                                     .icon(
                                                         Icon::new(IconName::Pencil)
                                                             .small()
@@ -480,7 +492,6 @@ mod tests {
             ItemStore::get(cx)
                 .items()
                 .keys()
-                .into_iter()
                 .next()
                 .copied()
                 .expect("item store should contain at least one item")

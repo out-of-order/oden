@@ -37,6 +37,7 @@ use crate::{root::AppRoot, store::ItemStore};
 use oden_core::db::setup_database;
 
 mod actions;
+mod appstatus;
 #[cfg(debug_assertions)]
 mod fixtures;
 mod icons;
@@ -48,7 +49,6 @@ mod store;
 #[cfg(test)]
 mod testutils;
 mod views;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let db = setup_database().await?;
