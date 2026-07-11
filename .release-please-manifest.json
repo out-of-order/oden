@@ -1,4 +1,4 @@
 {
-  "crates/oden-core": "0.2.0",
-  "crates/oden-app": "0.5.0"
+  "crates/oden-core": "0.3.0",
+  "crates/oden-app": "0.6.0"
 }

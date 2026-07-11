@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/out-of-order/oden/compare/oden-core-v0.2.0...oden-core-v0.3.0) (2026-07-11)
+
+
+### Features
+
+* create item ([c592554](https://github.com/out-of-order/oden/commit/c592554b3b4e6c05b4a89512c308116ea03c1d5c))
+* create item ([1b6e106](https://github.com/out-of-order/oden/commit/1b6e1062f48ae1e3259854f5aac242887658cd86))
+
 ## [0.2.0](https://github.com/out-of-order/Oden/compare/oden-core-v0.1.0...oden-core-v0.2.0) (2026-07-05)
 
 
