@@ -9,7 +9,8 @@ rust-embed = "8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = { version = "1.2.1", features = ["uuid1"] }
-oden-core = { path = "../oden-core"}
+oden-core = { path = "../oden-core" }
+oden-graph = { path = "../oden-graph" }
 gpui.workspace = true
 anyhow.workspace= true
 async-trait.workspace = true

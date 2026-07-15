@@ -4611,6 +4611,7 @@ dependencies = [
  "gpui",
  "gpui-component",
  "oden-core",
+ "oden-graph",
  "rust-embed",
  "schemars",
  "sea-orm",

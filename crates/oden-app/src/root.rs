@@ -15,7 +15,7 @@ use crate::{
     appstatus::AppStatus,
     icons::IconName,
     state::{AppMode, SelectedIdState},
-    views::{list::ListView, titlebar::Titlebar},
+    views::{graph::GraphView, list::ListView, titlebar::Titlebar},
 };
 
 pub struct AppRoot {
@@ -23,6 +23,7 @@ pub struct AppRoot {
     pub(crate) selected_id_state: Entity<SelectedIdState>,
     pub(crate) titlebar: Entity<Titlebar>,
     pub(crate) list_view: Entity<ListView>,
+    pub(crate) graph_view: Entity<GraphView>,
     pub(crate) focus: FocusHandle,
     pub(crate) _state_sub: Subscription,
 }
@@ -49,6 +50,7 @@ impl AppRoot {
                     status_entity.clone(),
                 )
             }),
+            graph_view: cx.new(|_| GraphView::new()),
             titlebar: cx.new(|cx| Titlebar::new(cx, window, status_entity)),
             selected_id_state,
             focus: cx.focus_handle(),
@@ -192,6 +194,7 @@ impl AppRoot {
     fn render_mode(&self, mode: AppMode) -> AnyElement {
         match mode {
             AppMode::List => self.list_view.clone().into_any_element(),
+            AppMode::Graph => self.graph_view.clone().into_any_element(),
             _ => SharedString::from(mode.to_string()).into_any_element(),
         }
     }

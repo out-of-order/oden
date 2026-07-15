@@ -43,7 +43,7 @@ impl Simulation {
             alpha_target: 0.0,
             alpha_decay: 0.0228,
             alpha_min: 0.001,
-            initial_radius: 10.0,
+            initial_radius: 50.0,
             initial_angle: PI * (3.0 - f32::sqrt(5.0)),
         };
         let mut simulation = Self {
