@@ -80,7 +80,7 @@ impl Simulation {
             self.should_stop = true;
             return;
         }
-        for force in &self.forces {
+        for force in &mut self.forces {
             // apply the registered forces to the nodes.
             // forces will influence the velocity of the nodes.
             force.apply_force(self.alpha, &mut self.graph);
@@ -98,6 +98,20 @@ impl Simulation {
             .values()
             .map(|node| node.position)
             .collect()
+    }
+
+    // returns the edges of the graph to draw by iterating over the adjacency list.
+    pub fn edges(&self) -> Vec<(Point<f32>, Point<f32>)> {
+        let mut edges: Vec<(Point<f32>, Point<f32>)> = Vec::new();
+        for source_id in self.graph.adjacency_list.keys() {
+            let source_node = self.graph.nodes.get(source_id).unwrap();
+            let neighbours: &Vec<Uuid> = self.graph.adjacency_list.get(source_id).unwrap();
+            for neighbour_id in neighbours {
+                let neighbour_node = self.graph.nodes.get(neighbour_id).unwrap();
+                edges.push((source_node.position, neighbour_node.position));
+            }
+        }
+        edges
     }
 
     pub fn stop(&mut self) {
