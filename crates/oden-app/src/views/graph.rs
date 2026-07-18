@@ -33,19 +33,15 @@ impl GraphView {
         }
     }
 
-    fn draw_vertice(
-        point: Point<f32>,
-        vertice_radius: f32,
-        view_port: Size<Pixels>,
-    ) -> Path<Pixels> {
+    fn draw_vertex(point: Point<f32>, vertex_radius: f32, view_port: Size<Pixels>) -> Path<Pixels> {
         let point = Self::to_pixels(point, view_port);
         let radius_vector = Point {
-            x: px(vertice_radius),
+            x: px(vertex_radius),
             y: px(0.),
         };
         let radii = Point {
-            x: px(vertice_radius),
-            y: px(vertice_radius),
+            x: px(vertex_radius),
+            y: px(vertex_radius),
         };
         let mut builder = PathBuilder::fill();
         builder.move_to(point);
@@ -98,7 +94,7 @@ impl Render for GraphView {
 
                     let vertices: Vec<Path<Pixels>> = positions
                         .iter()
-                        .map(|position| Self::draw_vertice(*position, 5.0, window.viewport_size()))
+                        .map(|position| Self::draw_vertex(*position, 5.0, window.viewport_size()))
                         .collect();
 
                     (vertices, edges)

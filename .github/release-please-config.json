@@ -7,6 +7,12 @@
     "crates/oden-app": {
       "release-type": "rust",
       "component": "oden"
+    },
+    {
+      "crates/oden-graph": {
+        "release-type": "rust",
+        "component": "oden-graph"
+      }
     }
   }
 }

@@ -11,9 +11,10 @@ pub trait Force {
     fn apply_force(&mut self, alpha: f32, nodes: &mut Graph);
 }
 
+// ----- Link Force ------
 pub struct LinkForce {
     pub x_rest: f32,
-    pub hooks_constant: f32,
+    pub spring_constant: f32,
     strengths: HashMap<Uuid, f32>,
 }
 
@@ -33,7 +34,7 @@ impl LinkForce {
     pub fn new() -> Self {
         Self {
             x_rest: 120.,
-            hooks_constant: 1.,
+            spring_constant: 1.,
             strengths: HashMap::new(),
         }
     }
@@ -65,8 +66,9 @@ impl Force for LinkForce {
                     continue;
                 }
                 let unit_vector = Point { x, y } / l;
-                // hooks law - k (x - x_rest) u where u is the unit vector
-                let force_vector = unit_vector * (-(l - self.x_rest) * self.hooks_constant * alpha);
+                // Hooke's law - k (x - x_rest) u where u is the unit vector
+                let force_vector =
+                    unit_vector * (-(l - self.x_rest) * self.spring_constant * alpha);
 
                 // calculate bias
                 let strength_source = self.strengths.get(source).unwrap();
@@ -84,5 +86,67 @@ impl Force for LinkForce {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use gpui::Point;
+
+    use crate::{
+        fixtures::{construct_graph, fully_connected},
+        forces::{Force, LinkForce},
+        simulation::{Graph, Node},
+    };
+
+    #[test]
+    fn test_node_strengths() {
+        let mut graph = construct_graph(4, fully_connected);
+        let mut force = LinkForce::default();
+        force.apply_force(1.0, &mut graph);
+        assert!(
+            force
+                .strengths
+                .values()
+                .all(|s| (*s - 1. / 3.).abs() < f32::EPSILON)
+        );
+    }
+
+    #[test]
+    fn test_link_force() {
+        let (source_id, source_node) = (uuid::Uuid::new_v4(), Point { x: 0., y: 0. });
+        let (target_id, target_node) = (uuid::Uuid::new_v4(), Point { x: 200., y: 0. });
+        let mut force = LinkForce::new();
+        let adjacency_list =
+            HashMap::from([(source_id, vec![target_id]), (target_id, vec![source_id])]);
+        let nodes = HashMap::from([
+            (
+                source_id,
+                Node {
+                    position: source_node,
+                    velocity: Point::default(),
+                },
+            ),
+            (
+                target_id,
+                Node {
+                    position: target_node,
+                    velocity: Point::default(),
+                },
+            ),
+        ]);
+        let mut nodes: Graph = Graph {
+            adjacency_list,
+            nodes,
+        };
+        // unit vector is (1, 0). Force is - k (x - xrest) * alpha * bias = 200 - 120 / 2 = 40
+        // bias is 1/2, each node has one neighbour.
+        force.apply_force(1., &mut nodes);
+        let source = nodes.nodes.get(&source_id).unwrap();
+        assert_eq!(source.velocity, Point { x: 40., y: 0. });
+        let target = nodes.nodes.get(&target_id).unwrap();
+        assert_eq!(target.velocity, Point { x: -40., y: 0. });
     }
 }

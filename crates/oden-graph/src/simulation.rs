@@ -37,7 +37,7 @@ pub struct Node {
 
 impl Simulation {
     pub fn new(graph: Graph) -> Self {
-        // default values are take from the d3-force repository
+        // default values are taken from the d3-force repository
         let options: SimulationOptions = SimulationOptions {
             velocity_decay: 0.4,
             alpha_target: 0.0,
@@ -177,6 +177,6 @@ mod tests {
         for _ in 0..1000 {
             simulation.tick();
         }
-        assert_eq!(simulation.should_stop, true)
+        assert!(simulation.should_stop)
     }
 }
