@@ -4,13 +4,14 @@ version = "0.6.0"
 edition = "2024"
 
 [dependencies]
-gpui = "0.2.2"
 gpui-component = { version = "0.5.1", features = ["tree-sitter-languages"] }
 rust-embed = "8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = { version = "1.2.1", features = ["uuid1"] }
-oden-core = { path = "../oden-core"}
+oden-core = { path = "../oden-core" }
+oden-graph = { path = "../oden-graph" }
+gpui.workspace = true
 anyhow.workspace= true
 async-trait.workspace = true
 tokio.workspace = true

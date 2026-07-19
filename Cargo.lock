@@ -4603,7 +4603,7 @@ dependencies = [
 
 [[package]]
 name = "oden"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4611,6 +4611,7 @@ dependencies = [
  "gpui",
  "gpui-component",
  "oden-core",
+ "oden-graph",
  "rust-embed",
  "schemars",
  "sea-orm",
@@ -4622,7 +4623,7 @@ dependencies = [
 
 [[package]]
 name = "oden-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4631,6 +4632,14 @@ dependencies = [
  "sea-orm",
  "thiserror 1.0.69",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "oden-graph"
+version = "0.1.0"
+dependencies = [
+ "gpui",
  "uuid",
 ]
 
