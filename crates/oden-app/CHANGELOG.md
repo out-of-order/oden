@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/out-of-order/oden/compare/oden-v0.6.0...oden-v0.7.0) (2026-07-19)
+
+
+### Features
+
+* **oden-graph:** graph setup and link force implementation ([cfe77bb](https://github.com/out-of-order/oden/commit/cfe77bbe8b01678184aa6fea6defb7558a96cc22))
+
 ## [0.6.0](https://github.com/out-of-order/oden/compare/oden-v0.5.0...oden-v0.6.0) (2026-07-11)
 
 
