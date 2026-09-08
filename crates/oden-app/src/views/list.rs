@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use gpui::{
     AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand, Entity,
-    FocusHandle, InteractiveElement, ParentElement, Render, SharedString, Styled, Subscription,
-    Window, div, px,
+    FocusHandle, FontWeight, InteractiveElement, ParentElement, Render, SharedString, Styled,
+    Subscription, Window, div, px,
 };
+use gpui_base::{Input, InputBase, input::InputEditorStyle};
 use gpui_component::{
     ActiveTheme, Icon, IndexPath, Sizable,
     button::{Button, ButtonVariants},
-    input::{Input, InputEvent, InputState},
+    input::{InputEvent, InputState},
     label::Label,
     list::{List, ListDelegate, ListItem, ListState},
     v_flex,
@@ -37,6 +38,7 @@ pub(crate) struct ListEntities {
     editor: Entity<EditorView>,
     list_state: Entity<ListState<ItemListDelegate>>,
     selected_id_state: Entity<SelectedIdState>,
+    title_input_state: Entity<InputState>,
 }
 
 impl ListView {
@@ -70,11 +72,13 @@ impl ListView {
         let input_state = Self::build_input_state(window, cx);
         let list_state = Self::build_list_state(window, cx, focus_handle.clone());
         let editor = Self::build_editor_view(window, cx, selected_id_state.clone());
+        let title_input_state = Self::build_title_input_state(window, cx);
         ListEntities {
             input_state,
             editor,
             list_state,
             selected_id_state,
+            title_input_state,
         }
     }
 
@@ -100,6 +104,17 @@ impl ListView {
 
     fn build_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
         cx.new(|cx| InputState::new(window, cx).placeholder("Search for anything..."))
+    }
+
+    fn build_title_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+        cx.new(|cx| {
+            let mut input_state = InputState::new(window, cx);
+            input_state.set_editor_style(InputEditorStyle {
+                caret: cx.theme().caret,
+                ..Default::default()
+            });
+            input_state
+        })
     }
 
     fn build_editor_view(
@@ -161,6 +176,25 @@ impl ListView {
             cx.notify();
         });
 
+        let _title_input_state_sub = cx.subscribe_in(
+            &entities.title_input_state,
+            window,
+            move |view, title_input_state, event: &InputEvent, _window, cx| {
+                if let InputEvent::Change = event {
+                    let Some(selected_id) = view.entities.selected_id_state.read(cx).selected_id
+                    else {
+                        return;
+                    };
+                    cx.update_global::<ItemStore, ()>(|store, cx| {
+                        let item = store.items.get_mut(&selected_id);
+                        if let Some(item) = item {
+                            item.name = title_input_state.read(cx).value();
+                        }
+                    })
+                }
+            },
+        );
+
         let selected_id_sub = cx.observe_in(
             &entities.selected_id_state,
             window,
@@ -175,6 +209,15 @@ impl ListView {
                 entities.list_state.update(cx, |state, cx| {
                     state.set_selected_index(selected_index, window, cx);
                 });
+                entities.title_input_state.update(cx, |state, cx| {
+                    selected_id.inspect(|id| {
+                        let item_maybe = ItemStore::get(cx).items.get(&id);
+                        if let Some(item) = item_maybe {
+                            let title = item.name.clone();
+                            state.set_value(title, window, cx);
+                        }
+                    });
+                });
             },
         );
 
@@ -182,6 +225,7 @@ impl ListView {
             _input_sub: input_sub,
             _store_sub: store_sub,
             _selected_id_sub: selected_id_sub,
+            _title_input_state_sub: _title_input_state_sub,
         }
     }
 }
@@ -190,6 +234,7 @@ struct ListSubscriptions {
     _input_sub: Subscription,
     _store_sub: Subscription,
     _selected_id_sub: Subscription,
+    _title_input_state_sub: Subscription,
 }
 
 struct ItemListDelegate {
@@ -370,9 +415,16 @@ impl Render for ListView {
                                                     .ghost(),
                                             ),
                                     )
-                                    .child(Input::new(&self.entities.input_state).prefix(
-                                        Icon::new(IconName::Search).small().text_color(muted_color),
-                                    )),
+                                    .child(
+                                        gpui_component::input::Input::new(
+                                            &self.entities.input_state,
+                                        )
+                                        .prefix(
+                                            Icon::new(IconName::Search)
+                                                .small()
+                                                .text_color(muted_color),
+                                        ),
+                                    ),
                             ),
                     )
                     .child(
@@ -388,6 +440,17 @@ impl Render for ListView {
                     .min_w_0()
                     .min_h_0()
                     .overflow_hidden()
+                    .child(
+                        InputBase::new("title-input")
+                            .child(Input::new(&self.entities.title_input_state))
+                            .w_full()
+                            .border_b(px(1.))
+                            .font_weight(FontWeight::BOLD)
+                            .p_2()
+                            .text_xl()
+                            .text_color(cx.theme().primary)
+                            .border_color(cx.theme().border),
+                    )
                     .child(self.entities.editor.clone()),
             )
     }

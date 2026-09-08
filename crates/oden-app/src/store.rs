@@ -54,7 +54,7 @@ impl ItemStore {
         Ok(())
     }
 
-    pub fn get(cx: &mut App) -> &Self {
+    pub fn get(cx: &App) -> &Self {
         cx.global::<ItemStore>()
     }
 
