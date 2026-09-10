@@ -7,13 +7,17 @@ use uuid::Uuid;
 
 use async_trait::async_trait;
 
-use crate::{entities::item, errors::UpdateItemError};
+use crate::{
+    entities::item::{self},
+    errors::UpdateItemError,
+};
 
 #[async_trait]
 pub trait ItemRepositoryTrait {
     async fn find_all(&self) -> Result<Vec<item::Model>, DbErr>;
     async fn create_item(&self) -> Result<item::Model, DbErr>;
     async fn update_item(&self, id: Uuid, content: String) -> Result<(), UpdateItemError>;
+    async fn update_title(&self, id: Uuid, title: String) -> Result<(), UpdateItemError>;
 }
 
 pub struct ItemRepository {
@@ -44,6 +48,10 @@ impl ItemRepositoryTrait for MockItemRepository {
     }
 
     async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
+        Ok(())
+    }
+
+    async fn update_title(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
         Ok(())
     }
 }
@@ -80,6 +88,19 @@ impl ItemRepositoryTrait for ItemRepository {
         if let Some(item) = item_maybe {
             let mut item: item::ActiveModel = item.into();
             item.content = Set(content);
+            item.modified_at = Set(Utc::now());
+            item.update(&self.db).await?;
+        } else {
+            return Err(UpdateItemError::NotFound);
+        }
+        Ok(())
+    }
+
+    async fn update_title(&self, id: Uuid, title: String) -> Result<(), UpdateItemError> {
+        let item_maybe = item::Entity::find_by_id(id).one(&self.db).await?;
+        if let Some(item) = item_maybe {
+            let mut item: item::ActiveModel = item.into();
+            item.name = Set(title);
             item.modified_at = Set(Utc::now());
             item.update(&self.db).await?;
         } else {

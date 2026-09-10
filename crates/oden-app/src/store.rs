@@ -15,6 +15,7 @@ use crate::models::Item;
 pub struct ItemStore {
     pub items: HashMap<uuid::Uuid, Item>,
     pub watch_tx: HashMap<Uuid, Sender<SharedString>>,
+    pub title_input_tx: HashMap<Uuid, Sender<SharedString>>,
     links: Vec<Link>,
 }
 
@@ -31,6 +32,7 @@ impl ItemStore {
             items: HashMap::new(),
             watch_tx: HashMap::new(),
             links: Vec::new(),
+            title_input_tx: HashMap::new(),
         };
         for item in mock_items() {
             store.items.insert(item.id, item);
@@ -44,6 +46,7 @@ impl ItemStore {
             let mut store = ItemStore {
                 items: HashMap::new(),
                 watch_tx: HashMap::new(),
+                title_input_tx: HashMap::new(),
                 links: Vec::new(),
             };
             for item in items {

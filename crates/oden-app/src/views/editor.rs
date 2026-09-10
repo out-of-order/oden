@@ -202,6 +202,10 @@ mod tests {
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
+
+        async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
+            Ok(())
+        }
     }
 
     #[gpui::test]

@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::persistence::PersistenceStatus;
 
-pub struct InputValueWatcher {}
+pub struct InputValueWatcher;
 
 impl InputValueWatcher {
     pub fn spawn(
@@ -25,18 +25,7 @@ impl InputValueWatcher {
                 if rx.changed().await.is_err() {
                     return;
                 }
-
-                loop {
-                    tokio::select! {
-                        _ = tokio::time::sleep(Duration::from_millis(1000)) => break,
-                        changed = rx.changed() => {
-                           if changed.is_err() {
-                               return;
-                           }
-                           continue;
-                        }
-                    }
-                }
+                Self::debounce(&mut rx).await;
                 if persistence_state_tx
                     .send(PersistenceStatus::Saving)
                     .is_err()
@@ -59,5 +48,39 @@ impl InputValueWatcher {
                 };
             }
         });
+    }
+
+    pub fn spawn_title_input_watcher(
+        mut rx: Receiver<SharedString>,
+        id: Uuid,
+        repository: Arc<dyn ItemRepositoryTrait + Send + Sync>,
+    ) {
+        tokio::spawn(async move {
+            loop {
+                if rx.changed().await.is_err() {
+                    return;
+                }
+                Self::debounce(&mut rx).await;
+                let title = rx.borrow_and_update().clone();
+                if let Err(_) = repository.update_title(id, title.to_string()).await {
+                    // TODO: add tracing
+                };
+            }
+        });
+    }
+
+    async fn debounce(rx: &mut Receiver<SharedString>) {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(1000)) => break,
+                changed = rx.changed() => {
+                   if changed.is_err() {
+                        return;
+                   } else {
+                        continue;
+                   }
+                }
+            }
+        }
     }
 }

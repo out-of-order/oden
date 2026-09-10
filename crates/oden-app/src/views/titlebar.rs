@@ -163,6 +163,10 @@ mod tests {
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
             Err(UpdateItemError::NotFound)
         }
+
+        async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
+            Err(UpdateItemError::NotFound)
+        }
     }
 
     #[gpui::test]

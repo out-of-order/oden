@@ -15,12 +15,14 @@ use gpui_component::{
     v_flex,
 };
 use oden_core::repository::ItemRepositoryTrait;
+use tokio::sync::watch;
 
 use crate::{
     ItemStore,
     actions::{self, NewItem, SelectItem},
     appstatus::{AppOperation, AppStatus, Issue},
     icons::IconName,
+    inputvaluewatcher::InputValueWatcher,
     repository::AppRepository,
     state::SelectedIdState,
 };
@@ -190,7 +192,19 @@ impl ListView {
                         if let Some(item) = item {
                             item.name = title_input_state.read(cx).value();
                         }
-                    })
+                    });
+                    let title = title_input_state.read(cx).value();
+                    let store = ItemStore::get_mut(cx);
+                    let needs_new_receiver = match store.title_input_tx.get(&selected_id) {
+                        Some(tx) => tx.send(title.clone()).is_err(),
+                        None => true,
+                    };
+                    if needs_new_receiver {
+                        let (tx, rx) = watch::channel(SharedString::from(title.clone()));
+                        store.title_input_tx.insert(selected_id, tx);
+                        let repository = cx.global::<AppRepository>().0.clone();
+                        InputValueWatcher::spawn_title_input_watcher(rx, selected_id, repository);
+                    }
                 }
             },
         );
@@ -499,6 +513,10 @@ mod tests {
         }
 
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
+            Ok(())
+        }
+
+        async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
     }
