@@ -40,7 +40,7 @@ pub(crate) struct ListEntities {
     editor: Entity<EditorView>,
     list_state: Entity<ListState<ItemListDelegate>>,
     selected_id_state: Entity<SelectedIdState>,
-    title_input_state: Entity<InputState>,
+    pub(crate) title_input_state: Entity<InputState>,
 }
 
 impl ListView {
@@ -618,5 +618,105 @@ mod tests {
                 assert_eq!(selected_id, target_id);
             })
             .unwrap();
+    }
+    #[gpui::test]
+    fn test_title_update_on_selected_id_change(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        cx.update(|cx| {
+            let repository = Arc::new(MockItemRepository);
+
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
+
+            let target_id = ItemStore::get(cx)
+                .items
+                .keys()
+                .next()
+                .copied()
+                .expect("item store should contain one item");
+            window
+                .update(cx, |root, window, cx| {
+                    root.focus.focus(window, cx);
+                    window.dispatch_action(
+                        Box::new(SelectItem {
+                            selected_id: target_id,
+                        }),
+                        cx,
+                    );
+                })
+                .unwrap();
+        });
+        cx.run_until_parked();
+        window
+            .update(cx, move |root, _window, cx| {
+                let actual_value = root
+                    .list_view
+                    .read(cx)
+                    .entities
+                    .title_input_state
+                    .read(cx)
+                    .value();
+                let item = ItemStore::get(cx)
+                    .items
+                    .values()
+                    .next()
+                    .cloned()
+                    .expect("item store should contain one item");
+                assert_eq!(item.name, actual_value);
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_title_input_updates_selected_item_store(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        cx.update(|cx| {
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
+        });
+        let target_id = cx.update(|cx| {
+            ItemStore::get(cx)
+                .items
+                .keys()
+                .next()
+                .copied()
+                .expect("item store should contain one item")
+        });
+        window
+            .update(cx, |root, window, cx| {
+                root.focus.focus(window, cx);
+                window.dispatch_action(
+                    Box::new(SelectItem {
+                        selected_id: target_id,
+                    }),
+                    cx,
+                );
+            })
+            .unwrap();
+        cx.run_until_parked();
+        window
+            .update(cx, |root, window, cx| {
+                let title_input_state = root.list_view.read(cx).entities.title_input_state.clone();
+                title_input_state.update(cx, |state, cx| {
+                    state.replace_all("Updated title", window, cx);
+                });
+            })
+            .unwrap();
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert_eq!(
+                ItemStore::get(cx)
+                    .items
+                    .get(&target_id)
+                    .expect("selected item should remain in the item store")
+                    .name,
+                "Updated title"
+            );
+        });
     }
 }
