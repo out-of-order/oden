@@ -13,7 +13,7 @@ use crate::persistence::PersistenceStatus;
 pub struct InputValueWatcher;
 
 impl InputValueWatcher {
-    pub fn spawn(
+    pub fn spawn_content_watcher(
         mut rx: Receiver<SharedString>,
         error_tx: UnboundedSender<UpdateItemError>,
         persistence_state_tx: UnboundedSender<PersistenceStatus>,
@@ -50,7 +50,7 @@ impl InputValueWatcher {
         });
     }
 
-    pub fn spawn_title_input_watcher(
+    pub fn spawn_title_watcher(
         mut rx: Receiver<SharedString>,
         id: Uuid,
         repository: Arc<dyn TitleRepositoryTrait + Send + Sync>,
@@ -62,8 +62,12 @@ impl InputValueWatcher {
                 }
                 Self::debounce(&mut rx).await;
                 let title = rx.borrow_and_update().clone();
-                if let Err(_) = repository.update_title(id, title.to_string()).await {
-                    // TODO: add tracing
+                if repository
+                    .update_title(id, title.to_string())
+                    .await
+                    .is_err()
+                {
+                    unreachable!()
                 };
             }
         });

@@ -106,7 +106,7 @@ impl EditorView {
                             }
                         })
                         .detach();
-                        InputValueWatcher::spawn(
+                        InputValueWatcher::spawn_content_watcher(
                             rx,
                             error_tx,
                             persistence_tx,

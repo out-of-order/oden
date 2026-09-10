@@ -178,7 +178,7 @@ impl ListView {
             cx.notify();
         });
 
-        let _title_input_state_sub = cx.subscribe_in(
+        let title_input_state_sub = cx.subscribe_in(
             &entities.title_input_state,
             window,
             move |view, title_input_state, event: &InputEvent, _window, cx| {
@@ -200,10 +200,10 @@ impl ListView {
                         None => true,
                     };
                     if needs_new_receiver {
-                        let (tx, rx) = watch::channel(SharedString::from(title.clone()));
+                        let (tx, rx) = watch::channel(title.clone());
                         store.title_input_tx.insert(selected_id, tx);
                         let repository = cx.global::<AppRepository>().title.clone();
-                        InputValueWatcher::spawn_title_input_watcher(rx, selected_id, repository);
+                        InputValueWatcher::spawn_title_watcher(rx, selected_id, repository);
                     }
                 }
             },
@@ -225,7 +225,7 @@ impl ListView {
                 });
                 entities.title_input_state.update(cx, |state, cx| {
                     selected_id.inspect(|id| {
-                        let item_maybe = ItemStore::get(cx).items.get(&id);
+                        let item_maybe = ItemStore::get(cx).items.get(id);
                         if let Some(item) = item_maybe {
                             let title = item.name.clone();
                             state.set_value(title, window, cx);
@@ -239,7 +239,7 @@ impl ListView {
             _input_sub: input_sub,
             _store_sub: store_sub,
             _selected_id_sub: selected_id_sub,
-            _title_input_state_sub: _title_input_state_sub,
+            _title_input_state_sub: title_input_state_sub,
         }
     }
 }
