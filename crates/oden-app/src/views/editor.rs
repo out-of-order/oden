@@ -74,7 +74,7 @@ impl EditorView {
                     if needs_new_receiver {
                         let (tx, rx) = watch::channel(new_content.clone());
                         store.watch_tx.insert(selected_id, tx);
-                        let repository = cx.global::<AppRepository>().0.clone();
+                        let repository = cx.global::<AppRepository>().item.clone();
                         let (error_tx, mut error_rx) =
                             tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
                         cx.spawn(async move |_this, cx| {
@@ -183,7 +183,7 @@ mod tests {
     use async_trait::async_trait;
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
-    use oden_core::repository::ItemRepositoryTrait;
+    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use uuid::Uuid;
 
@@ -202,7 +202,10 @@ mod tests {
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
+    }
 
+    #[async_trait]
+    impl TitleRepositoryTrait for MockItemRepository {
         async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
@@ -212,9 +215,11 @@ mod tests {
     fn test_editor_updates_on_select(cx: &mut gpui::TestAppContext) {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
         });
         let selected_id = cx.update(|cx| {
             ItemStore::get(cx)

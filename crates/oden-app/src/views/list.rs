@@ -202,7 +202,7 @@ impl ListView {
                     if needs_new_receiver {
                         let (tx, rx) = watch::channel(SharedString::from(title.clone()));
                         store.title_input_tx.insert(selected_id, tx);
-                        let repository = cx.global::<AppRepository>().0.clone();
+                        let repository = cx.global::<AppRepository>().title.clone();
                         InputValueWatcher::spawn_title_input_watcher(rx, selected_id, repository);
                     }
                 }
@@ -358,7 +358,7 @@ impl Render for ListView {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
                 let selected_id_state = this.entities.selected_id_state.clone();
-                let repository = cx.global::<AppRepository>().0.clone();
+                let repository = cx.global::<AppRepository>().item.clone();
                 cx.spawn(async move |_this, cx| {
                     if let Err(err) = Self::add_empty_item(cx, repository, selected_id_state).await
                     {
@@ -485,7 +485,7 @@ mod tests {
     use gpui::TestAppContext;
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
-    use oden_core::repository::ItemRepositoryTrait;
+    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use serde_json::json;
     use uuid::Uuid;
@@ -515,7 +515,10 @@ mod tests {
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
+    }
 
+    #[async_trait]
+    impl TitleRepositoryTrait for MockItemRepository {
         async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
@@ -525,9 +528,11 @@ mod tests {
     fn test_list_items_navigation(cx: &mut TestAppContext) {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
         });
         let uuid = Uuid::new_v4();
         window
@@ -549,9 +554,11 @@ mod tests {
     fn test_new_item_creation(cx: &mut TestAppContext) {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
         });
         window
             .update(cx, |root, window, cx| {
@@ -576,9 +583,11 @@ mod tests {
     fn test_selected_id_subscription(cx: &mut TestAppContext) {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(AppRepository {
+                item: repository.clone(),
+                title: repository,
+            });
         });
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)

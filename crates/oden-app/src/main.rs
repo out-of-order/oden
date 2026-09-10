@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
                     eprintln!("failed to initialize ItemStore: {err:?}");
                     return;
                 }
-                AppRepository::init(cx, repository);
+                AppRepository::init(cx, repository.clone(), repository);
                 cx.open_window(window_options, |window, cx| {
                     let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
                     let selected_id_state: Entity<SelectedIdState> =

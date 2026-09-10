@@ -130,7 +130,7 @@ mod tests {
     use std::time::Duration;
 
     use gpui::TestAppContext;
-    use oden_core::repository::ItemRepositoryTrait;
+    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use oden_core::{entities::item, errors::UpdateItemError};
     use sea_orm::DbErr;
     use uuid::Uuid;
@@ -163,7 +163,10 @@ mod tests {
         async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
             Err(UpdateItemError::NotFound)
         }
+    }
 
+    #[async_trait]
+    impl TitleRepositoryTrait for FailingItemRepository {
         async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Err(UpdateItemError::NotFound)
         }
@@ -173,9 +176,11 @@ mod tests {
     fn test_titlebar_status_change_on_issues(cx: &mut TestAppContext) {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
-            let failing_repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(FailingItemRepository {});
-            cx.set_global(AppRepository(failing_repository));
+            let failing_repository = Arc::new(FailingItemRepository {});
+            cx.set_global(AppRepository {
+                item: failing_repository.clone(),
+                title: failing_repository,
+            });
         });
         window
             .update(cx, |root, window, cx| {
@@ -204,9 +209,11 @@ mod tests {
     #[gpui::test]
     fn test_titlebar_persistence_status_failed(cx: &mut TestAppContext) {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
-        let failing_repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-            Arc::new(FailingItemRepository {});
-        cx.set_global(AppRepository(failing_repository));
+        let failing_repository = Arc::new(FailingItemRepository {});
+        cx.set_global(AppRepository {
+            item: failing_repository.clone(),
+            title: failing_repository,
+        });
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)
                 .items()

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use gpui::SharedString;
 use oden_core::errors::UpdateItemError;
-use oden_core::repository::ItemRepositoryTrait;
+use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
 use uuid::Uuid;
@@ -53,7 +53,7 @@ impl InputValueWatcher {
     pub fn spawn_title_input_watcher(
         mut rx: Receiver<SharedString>,
         id: Uuid,
-        repository: Arc<dyn ItemRepositoryTrait + Send + Sync>,
+        repository: Arc<dyn TitleRepositoryTrait + Send + Sync>,
     ) {
         tokio::spawn(async move {
             loop {
