@@ -14,15 +14,14 @@ use gpui_component::{
     list::{List, ListDelegate, ListItem, ListState},
     v_flex,
 };
-use oden_core::{errors::UpdateItemError, repository::ItemRepositoryTrait};
-use tokio::sync::watch;
+use oden_core::repository::ItemRepositoryTrait;
 
 use crate::{
     ItemStore,
     actions::{self, NewItem, SelectItem},
     appstatus::{AppOperation, AppStatus, Field, Issue},
     icons::IconName,
-    inputvaluewatcher::InputValueWatcher,
+    inputvaluewatcher::InputPersistence,
     repository::{ItemRepository, TitleRepository},
     state::SelectedIdState,
 };
@@ -200,25 +199,21 @@ impl ListView {
                         None => true,
                     };
                     if needs_new_receiver {
-                        let (tx, rx) = watch::channel(title.clone());
-                        store.title_input_tx.insert(selected_id, tx);
                         let repository = cx.global::<TitleRepository>().0.clone();
-                        let (_error_tx, mut error_rx) =
-                            tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
-                        cx.spawn(async move |_this, cx| {
-                            while let Some(error_value) = error_rx.recv().await {
-                                cx.update(|cx| {
-                                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
-                                        app_status.issues.insert(
-                                            AppOperation::UpdateItem(Field::Title),
-                                            Issue::new(error_value.to_string()),
-                                        );
-                                    })
-                                });
-                            }
-                        })
-                        .detach();
-                        InputValueWatcher::spawn_title_watcher(rx, selected_id, repository);
+                        InputPersistence::spawn(
+                            cx,
+                            selected_id,
+                            title.clone(),
+                            Field::Title,
+                            move |title: SharedString| {
+                                let repository = repository.clone();
+                                Box::pin(async move {
+                                    repository
+                                        .update_title(selected_id, title.to_string())
+                                        .await
+                                })
+                            },
+                        );
                     }
                 }
             },
@@ -497,12 +492,13 @@ mod tests {
     use crate::testutils::setup;
     use async_trait::async_trait;
     use chrono::Utc;
-    use gpui::TestAppContext;
+    use gpui::{SharedString, TestAppContext};
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
     use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use serde_json::json;
+    use tokio::sync::watch;
     use uuid::Uuid;
 
     struct MockItemRepository;
@@ -682,6 +678,12 @@ mod tests {
                 .next()
                 .copied()
                 .expect("item store should contain one item")
+        });
+        let (title_tx, _title_rx) = watch::channel(SharedString::from(""));
+        cx.update(|cx| {
+            ItemStore::get_mut(cx)
+                .title_input_tx
+                .insert(target_id, title_tx);
         });
         window
             .update(cx, |root, window, cx| {

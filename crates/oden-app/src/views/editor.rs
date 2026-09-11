@@ -1,19 +1,16 @@
 use comrak_gpui::render_document;
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, ParentElement, Render, Styled, Subscription,
-    Window, div, px,
+    AppContext, Context, Entity, ParentElement, Render, SharedString, Styled, Subscription, Window,
+    div, px,
 };
 use gpui_component::ActiveTheme;
 use gpui_component::input::{Editor, EditorState, InputEvent};
 use gpui_component::scroll::ScrollableElement;
-use oden_core::errors::UpdateItemError;
-use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::appstatus::{AppOperation, AppStatus, Field, Issue};
-use crate::inputvaluewatcher::InputValueWatcher;
+use crate::appstatus::Field;
+use crate::inputvaluewatcher::InputPersistence;
 use crate::models::Item;
-use crate::persistence::{PersistencePerNote, PersistenceStatus};
 use crate::repository::ContentRepository;
 use crate::state::SelectedIdState;
 use crate::store::ItemStore;
@@ -72,46 +69,20 @@ impl EditorView {
                         None => true,
                     };
                     if needs_new_receiver {
-                        let (tx, rx) = watch::channel(new_content.clone());
-                        store.item_content_tx.insert(selected_id, tx);
                         let repository = cx.global::<ContentRepository>().0.clone();
-                        let (error_tx, mut error_rx) =
-                            tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
-                        cx.spawn(async move |_this, cx| {
-                            while let Some(error_value) = error_rx.recv().await {
-                                cx.update(|cx| {
-                                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
-                                        app_status.issues.insert(
-                                            AppOperation::UpdateItem(Field::Content),
-                                            Issue::new(error_value.to_string()),
-                                        );
-                                    })
-                                });
-                            }
-                        })
-                        .detach();
-                        let (persistence_tx, mut persistence_rx) =
-                            tokio::sync::mpsc::unbounded_channel::<PersistenceStatus>();
-                        cx.spawn(async move |_this, cx| {
-                            while let Some(persistence_value) = persistence_rx.recv().await {
-                                cx.update(|cx| {
-                                    cx.update_global::<PersistencePerNote, ()>(
-                                        |persistence_per_note, _cx| {
-                                            persistence_per_note
-                                                .0
-                                                .insert(selected_id, persistence_value);
-                                        },
-                                    )
-                                });
-                            }
-                        })
-                        .detach();
-                        InputValueWatcher::spawn_content_watcher(
-                            rx,
-                            error_tx,
-                            persistence_tx,
+                        InputPersistence::spawn(
+                            cx,
                             selected_id,
-                            repository,
+                            new_content,
+                            Field::Content,
+                            move |content: SharedString| {
+                                let repository = repository.clone();
+                                Box::pin(async move {
+                                    repository
+                                        .update_content(selected_id, content.to_string())
+                                        .await
+                                })
+                            },
                         );
                     }
                 }

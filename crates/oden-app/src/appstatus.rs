@@ -22,7 +22,7 @@ pub(crate) enum AppOperation {
     UpdateItem(Field),
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, Hash, PartialEq, PartialOrd, Copy, Clone)]
 pub(crate) enum Field {
     Title,
     Content,
