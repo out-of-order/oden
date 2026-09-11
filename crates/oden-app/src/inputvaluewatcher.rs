@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use gpui::SharedString;
 use oden_core::errors::UpdateItemError;
-use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
+use oden_core::repository::{ContentRepositoryTrait, TitleRepositoryTrait};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Receiver;
 use uuid::Uuid;
@@ -18,7 +18,7 @@ impl InputValueWatcher {
         error_tx: UnboundedSender<UpdateItemError>,
         persistence_state_tx: UnboundedSender<PersistenceStatus>,
         id: Uuid,
-        repository: Arc<dyn ItemRepositoryTrait + Send + Sync>,
+        repository: Arc<dyn ContentRepositoryTrait + Send + Sync>,
     ) {
         tokio::spawn(async move {
             loop {
@@ -33,7 +33,7 @@ impl InputValueWatcher {
                     return;
                 };
                 let content = rx.borrow_and_update().clone();
-                if let Err(e) = repository.update_item(id, content.to_string()).await {
+                if let Err(e) = repository.update_content(id, content.to_string()).await {
                     if persistence_state_tx
                         .send(PersistenceStatus::Failed)
                         .is_err()
@@ -66,9 +66,7 @@ impl InputValueWatcher {
                     .update_title(id, title.to_string())
                     .await
                     .is_err()
-                {
-                    unreachable!()
-                };
+                {};
             }
         });
     }

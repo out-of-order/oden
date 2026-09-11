@@ -16,7 +16,11 @@ use crate::{
 pub trait ItemRepositoryTrait {
     async fn find_all(&self) -> Result<Vec<item::Model>, DbErr>;
     async fn create_item(&self) -> Result<item::Model, DbErr>;
-    async fn update_item(&self, id: Uuid, content: String) -> Result<(), UpdateItemError>;
+}
+
+#[async_trait]
+pub trait ContentRepositoryTrait {
+    async fn update_content(&self, id: Uuid, content: String) -> Result<(), UpdateItemError>;
 }
 
 #[async_trait]
@@ -50,10 +54,6 @@ impl ItemRepositoryTrait for MockItemRepository {
             modified_at: now,
         })
     }
-
-    async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
-        Ok(())
-    }
 }
 
 impl ItemRepository {
@@ -82,8 +82,11 @@ impl ItemRepositoryTrait for ItemRepository {
         };
         item_instance.insert(&self.db).await
     }
+}
 
-    async fn update_item(&self, id: Uuid, content: String) -> Result<(), UpdateItemError> {
+#[async_trait]
+impl ContentRepositoryTrait for ItemRepository {
+    async fn update_content(&self, id: Uuid, content: String) -> Result<(), UpdateItemError> {
         let item_maybe = item::Entity::find_by_id(id).one(&self.db).await?;
         if let Some(item) = item_maybe {
             let mut item: item::ActiveModel = item.into();

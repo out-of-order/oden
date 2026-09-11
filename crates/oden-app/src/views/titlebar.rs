@@ -137,9 +137,9 @@ mod tests {
 
     use crate::appstatus::AppStatus;
     use crate::persistence::PersistenceStatus;
+    use crate::repository::{ItemRepository, TitleRepository};
     use crate::{
         actions::{NewItem, SelectItem},
-        repository::AppRepository,
         store::ItemStore,
         testutils::setup,
     };
@@ -159,10 +159,6 @@ mod tests {
                 "an error occurred when inserting an item".into(),
             ))
         }
-
-        async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
-            Err(UpdateItemError::NotFound)
-        }
     }
 
     #[async_trait]
@@ -177,10 +173,8 @@ mod tests {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let failing_repository = Arc::new(FailingItemRepository {});
-            cx.set_global(AppRepository {
-                item: failing_repository.clone(),
-                title: failing_repository,
-            });
+            cx.set_global::<TitleRepository>(TitleRepository(failing_repository.clone()));
+            cx.set_global::<ItemRepository>(ItemRepository(failing_repository.clone()));
         });
         window
             .update(cx, |root, window, cx| {
@@ -210,10 +204,8 @@ mod tests {
     fn test_titlebar_persistence_status_failed(cx: &mut TestAppContext) {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         let failing_repository = Arc::new(FailingItemRepository {});
-        cx.set_global(AppRepository {
-            item: failing_repository.clone(),
-            title: failing_repository,
-        });
+        cx.set_global(ItemRepository(failing_repository.clone()));
+        cx.set_global(TitleRepository(failing_repository.clone()));
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)
                 .items()

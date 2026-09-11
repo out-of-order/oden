@@ -14,16 +14,16 @@ use gpui_component::{
     list::{List, ListDelegate, ListItem, ListState},
     v_flex,
 };
-use oden_core::repository::ItemRepositoryTrait;
+use oden_core::{errors::UpdateItemError, repository::ItemRepositoryTrait};
 use tokio::sync::watch;
 
 use crate::{
     ItemStore,
     actions::{self, NewItem, SelectItem},
-    appstatus::{AppOperation, AppStatus, Issue},
+    appstatus::{AppOperation, AppStatus, Field, Issue},
     icons::IconName,
     inputvaluewatcher::InputValueWatcher,
-    repository::AppRepository,
+    repository::{ItemRepository, TitleRepository},
     state::SelectedIdState,
 };
 use crate::{models::Item, views::editor::EditorView};
@@ -202,7 +202,22 @@ impl ListView {
                     if needs_new_receiver {
                         let (tx, rx) = watch::channel(title.clone());
                         store.title_input_tx.insert(selected_id, tx);
-                        let repository = cx.global::<AppRepository>().title.clone();
+                        let repository = cx.global::<TitleRepository>().0.clone();
+                        let (_error_tx, mut error_rx) =
+                            tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
+                        cx.spawn(async move |_this, cx| {
+                            while let Some(error_value) = error_rx.recv().await {
+                                cx.update(|cx| {
+                                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
+                                        app_status.issues.insert(
+                                            AppOperation::UpdateItem(Field::Title),
+                                            Issue::new(error_value.to_string()),
+                                        );
+                                    })
+                                });
+                            }
+                        })
+                        .detach();
                         InputValueWatcher::spawn_title_watcher(rx, selected_id, repository);
                     }
                 }
@@ -358,7 +373,7 @@ impl Render for ListView {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
                 let selected_id_state = this.entities.selected_id_state.clone();
-                let repository = cx.global::<AppRepository>().item.clone();
+                let repository = cx.global::<ItemRepository>().0.clone();
                 cx.spawn(async move |_this, cx| {
                     if let Err(err) = Self::add_empty_item(cx, repository, selected_id_state).await
                     {
@@ -477,7 +492,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::actions::{NewItem, SelectItem};
-    use crate::repository::AppRepository;
+    use crate::repository::{ItemRepository, TitleRepository};
     use crate::store::ItemStore;
     use crate::testutils::setup;
     use async_trait::async_trait;
@@ -511,10 +526,6 @@ mod tests {
                 modified_at: now,
             })
         }
-
-        async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
-            Ok(())
-        }
     }
 
     #[async_trait]
@@ -529,10 +540,7 @@ mod tests {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(ItemRepository(repository.clone()));
         });
         let uuid = Uuid::new_v4();
         window
@@ -555,10 +563,7 @@ mod tests {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(ItemRepository(repository));
         });
         window
             .update(cx, |root, window, cx| {
@@ -584,10 +589,7 @@ mod tests {
         let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(ItemRepository(repository));
         });
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)
@@ -625,10 +627,7 @@ mod tests {
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
 
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(TitleRepository(repository.clone()));
 
             let target_id = ItemStore::get(cx)
                 .items
@@ -674,10 +673,7 @@ mod tests {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(TitleRepository(repository));
         });
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)

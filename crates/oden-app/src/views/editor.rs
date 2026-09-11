@@ -10,11 +10,11 @@ use oden_core::errors::UpdateItemError;
 use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::appstatus::{AppOperation, AppStatus, Issue};
+use crate::appstatus::{AppOperation, AppStatus, Field, Issue};
 use crate::inputvaluewatcher::InputValueWatcher;
 use crate::models::Item;
 use crate::persistence::{PersistencePerNote, PersistenceStatus};
-use crate::repository::AppRepository;
+use crate::repository::ContentRepository;
 use crate::state::SelectedIdState;
 use crate::store::ItemStore;
 
@@ -67,14 +67,14 @@ impl EditorView {
                     if let Some(item) = store.items.get_mut(&selected_id) {
                         item.content = new_content.clone();
                     }
-                    let needs_new_receiver = match store.watch_tx.get(&selected_id) {
+                    let needs_new_receiver = match store.item_content_tx.get(&selected_id) {
                         Some(tx) => tx.send(new_content.clone()).is_err(),
                         None => true,
                     };
                     if needs_new_receiver {
                         let (tx, rx) = watch::channel(new_content.clone());
-                        store.watch_tx.insert(selected_id, tx);
-                        let repository = cx.global::<AppRepository>().item.clone();
+                        store.item_content_tx.insert(selected_id, tx);
+                        let repository = cx.global::<ContentRepository>().0.clone();
                         let (error_tx, mut error_rx) =
                             tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
                         cx.spawn(async move |_this, cx| {
@@ -82,7 +82,7 @@ impl EditorView {
                                 cx.update(|cx| {
                                     cx.update_global::<AppStatus, ()>(|app_status, _cx| {
                                         app_status.issues.insert(
-                                            AppOperation::UpdateItem,
+                                            AppOperation::UpdateItem(Field::Content),
                                             Issue::new(error_value.to_string()),
                                         );
                                     })
@@ -177,7 +177,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::actions::SelectItem;
-    use crate::repository::AppRepository;
+    use crate::repository::ItemRepository;
     use crate::store::ItemStore;
     use crate::testutils::setup;
     use async_trait::async_trait;
@@ -198,10 +198,6 @@ mod tests {
         async fn create_item(&self) -> Result<item::Model, DbErr> {
             Err(DbErr::Custom("not used in this test".into()))
         }
-
-        async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
-            Ok(())
-        }
     }
 
     #[async_trait]
@@ -216,10 +212,7 @@ mod tests {
         let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
-            cx.set_global(AppRepository {
-                item: repository.clone(),
-                title: repository,
-            });
+            cx.set_global(ItemRepository(repository));
         });
         let selected_id = cx.update(|cx| {
             ItemStore::get(cx)

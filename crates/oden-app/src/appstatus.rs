@@ -19,7 +19,13 @@ pub(crate) struct Issue {
 #[derive(Debug, Eq, Hash, PartialEq, PartialOrd)]
 pub(crate) enum AppOperation {
     CreateNewItem,
-    UpdateItem,
+    UpdateItem(Field),
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, PartialOrd)]
+pub(crate) enum Field {
+    Title,
+    Content,
 }
 
 impl Issue {
