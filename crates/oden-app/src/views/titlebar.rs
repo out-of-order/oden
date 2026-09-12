@@ -131,6 +131,7 @@ impl Render for Titlebar {
 
 #[cfg(test)]
 mod tests {
+    use crate::appstatus::Field;
     use std::assert_matches;
     use std::sync::Arc;
 
@@ -209,7 +210,7 @@ mod tests {
             cx.update_global::<PersistencePerNote, ()>(|persistence_per_note, _cx| {
                 persistence_per_note
                     .0
-                    .insert(item_id, PersistenceStatus::Failed);
+                    .insert((item_id, Field::Content), PersistenceStatus::Failed);
             });
         });
         cx.run_until_parked();

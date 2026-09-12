@@ -69,7 +69,9 @@ impl InputPersistence {
             while let Some(persistence_value) = persistence_rx.recv().await {
                 cx.update(|cx| {
                     cx.update_global::<PersistencePerNote, ()>(|persistence_per_note, _cx| {
-                        persistence_per_note.0.insert(item_id, persistence_value);
+                        persistence_per_note
+                            .0
+                            .insert((item_id, updated_field), persistence_value);
                     })
                 });
             }
