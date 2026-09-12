@@ -14,7 +14,8 @@ use crate::fixtures::mock_items;
 use crate::models::Item;
 pub struct ItemStore {
     pub items: HashMap<uuid::Uuid, Item>,
-    pub watch_tx: HashMap<Uuid, Sender<SharedString>>,
+    pub item_content_tx: HashMap<Uuid, Sender<SharedString>>,
+    pub title_input_tx: HashMap<Uuid, Sender<SharedString>>,
     links: Vec<Link>,
 }
 
@@ -29,8 +30,9 @@ impl ItemStore {
     pub fn mock_store(cx: &mut App) {
         let mut store = ItemStore {
             items: HashMap::new(),
-            watch_tx: HashMap::new(),
+            item_content_tx: HashMap::new(),
             links: Vec::new(),
+            title_input_tx: HashMap::new(),
         };
         for item in mock_items() {
             store.items.insert(item.id, item);
@@ -43,7 +45,8 @@ impl ItemStore {
         cx.update(move |cx| {
             let mut store = ItemStore {
                 items: HashMap::new(),
-                watch_tx: HashMap::new(),
+                item_content_tx: HashMap::new(),
+                title_input_tx: HashMap::new(),
                 links: Vec::new(),
             };
             for item in items {
@@ -54,7 +57,7 @@ impl ItemStore {
         Ok(())
     }
 
-    pub fn get(cx: &mut App) -> &Self {
+    pub fn get(cx: &App) -> &Self {
         cx.global::<ItemStore>()
     }
 

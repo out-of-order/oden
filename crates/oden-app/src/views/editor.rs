@@ -1,20 +1,17 @@
 use comrak_gpui::render_document;
 use gpui::{
-    AppContext, BorrowAppContext, Context, Entity, ParentElement, Render, Styled, Subscription,
-    Window, div, px,
+    AppContext, Context, Entity, ParentElement, Render, SharedString, Styled, Subscription, Window,
+    div, px,
 };
 use gpui_component::ActiveTheme;
 use gpui_component::input::{Editor, EditorState, InputEvent};
 use gpui_component::scroll::ScrollableElement;
-use oden_core::errors::UpdateItemError;
-use tokio::sync::watch;
 use uuid::Uuid;
 
-use crate::appstatus::{AppOperation, AppStatus, Issue};
-use crate::inputvaluewatcher::InputValueWatcher;
+use crate::appstatus::Field;
+use crate::inputvaluewatcher::InputPersistence;
 use crate::models::Item;
-use crate::persistence::{PersistencePerNote, PersistenceStatus};
-use crate::repository::AppRepository;
+use crate::repository::ContentRepository;
 use crate::state::SelectedIdState;
 use crate::store::ItemStore;
 
@@ -67,51 +64,25 @@ impl EditorView {
                     if let Some(item) = store.items.get_mut(&selected_id) {
                         item.content = new_content.clone();
                     }
-                    let needs_new_receiver = match store.watch_tx.get(&selected_id) {
+                    let needs_new_receiver = match store.item_content_tx.get(&selected_id) {
                         Some(tx) => tx.send(new_content.clone()).is_err(),
                         None => true,
                     };
                     if needs_new_receiver {
-                        let (tx, rx) = watch::channel(new_content.clone());
-                        store.watch_tx.insert(selected_id, tx);
-                        let repository = cx.global::<AppRepository>().0.clone();
-                        let (error_tx, mut error_rx) =
-                            tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
-                        cx.spawn(async move |_this, cx| {
-                            while let Some(error_value) = error_rx.recv().await {
-                                cx.update(|cx| {
-                                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
-                                        app_status.issues.insert(
-                                            AppOperation::UpdateItem,
-                                            Issue::new(error_value.to_string()),
-                                        );
-                                    })
-                                });
-                            }
-                        })
-                        .detach();
-                        let (persistence_tx, mut persistence_rx) =
-                            tokio::sync::mpsc::unbounded_channel::<PersistenceStatus>();
-                        cx.spawn(async move |_this, cx| {
-                            while let Some(persistence_value) = persistence_rx.recv().await {
-                                cx.update(|cx| {
-                                    cx.update_global::<PersistencePerNote, ()>(
-                                        |persistence_per_note, _cx| {
-                                            persistence_per_note
-                                                .0
-                                                .insert(selected_id, persistence_value);
-                                        },
-                                    )
-                                });
-                            }
-                        })
-                        .detach();
-                        InputValueWatcher::spawn(
-                            rx,
-                            error_tx,
-                            persistence_tx,
+                        let repository = cx.global::<ContentRepository>().0.clone();
+                        InputPersistence::spawn(
+                            cx,
                             selected_id,
-                            repository,
+                            new_content,
+                            Field::Content,
+                            move |content: SharedString| {
+                                let repository = repository.clone();
+                                Box::pin(async move {
+                                    repository
+                                        .update_content(selected_id, content.to_string())
+                                        .await
+                                })
+                            },
                         );
                     }
                 }
@@ -127,11 +98,6 @@ impl EditorView {
 
     fn get_item_for_selected_id(cx: &mut Context<Self>, selected_id: Uuid) -> Option<Item> {
         ItemStore::get(cx).items().get(&selected_id).cloned()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn input_state(&self) -> Entity<EditorState> {
-        self.input_state.clone()
     }
 }
 
@@ -177,13 +143,13 @@ mod tests {
     use std::sync::Arc;
 
     use crate::actions::SelectItem;
-    use crate::repository::AppRepository;
+    use crate::repository::ItemRepository;
     use crate::store::ItemStore;
     use crate::testutils::setup;
     use async_trait::async_trait;
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
-    use oden_core::repository::ItemRepositoryTrait;
+    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use uuid::Uuid;
 
@@ -198,19 +164,21 @@ mod tests {
         async fn create_item(&self) -> Result<item::Model, DbErr> {
             Err(DbErr::Custom("not used in this test".into()))
         }
+    }
 
-        async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
+    #[async_trait]
+    impl TitleRepositoryTrait for MockItemRepository {
+        async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
     }
 
     #[gpui::test]
     fn test_editor_updates_on_select(cx: &mut gpui::TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(ItemRepository(repository));
         });
         let selected_id = cx.update(|cx| {
             ItemStore::get(cx)
