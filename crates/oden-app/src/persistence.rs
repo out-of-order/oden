@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use gpui::{App, Global};
 use uuid::Uuid;
 
-use crate::persistence::PersistenceStatus::{Failed, Idle, Saving};
+use crate::{
+    appstatus::Field,
+    persistence::PersistenceStatus::{Failed, Idle, Saving},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub enum PersistenceStatus {
@@ -22,7 +25,7 @@ impl PersistenceStatus {
     }
 }
 
-pub struct PersistencePerNote(pub HashMap<Uuid, PersistenceStatus>);
+pub struct PersistencePerNote(pub HashMap<(Uuid, Field), PersistenceStatus>);
 
 impl Global for PersistencePerNote {}
 

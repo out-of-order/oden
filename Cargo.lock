@@ -5314,6 +5314,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "comrak-gpui",
+ "gpui-base",
  "gpui-component",
  "gpui-pre",
  "gpui-pre-platform",

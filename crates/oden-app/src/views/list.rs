@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use gpui::{
     AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand, Entity,
-    FocusHandle, InteractiveElement, ParentElement, Render, SharedString, Styled, Subscription,
-    Window, div, px,
+    FocusHandle, FontWeight, InteractiveElement, ParentElement, Render, SharedString, Styled,
+    Subscription, Window, div, px,
 };
+use gpui_base::{Input, InputBase, input::InputEditorStyle};
 use gpui_component::{
     ActiveTheme, Icon, IndexPath, Sizable,
     button::{Button, ButtonVariants},
-    input::{Input, InputEvent, InputState},
+    input::{InputEvent, InputState},
     label::Label,
     list::{List, ListDelegate, ListItem, ListState},
     v_flex,
@@ -18,9 +19,10 @@ use oden_core::repository::ItemRepositoryTrait;
 use crate::{
     ItemStore,
     actions::{self, NewItem, SelectItem},
-    appstatus::{AppOperation, AppStatus, Issue},
+    appstatus::{AppOperation, AppStatus, Field, Issue},
     icons::IconName,
-    repository::AppRepository,
+    inputvaluewatcher::InputPersistence,
+    repository::{ItemRepository, TitleRepository},
     state::SelectedIdState,
 };
 use crate::{models::Item, views::editor::EditorView};
@@ -37,6 +39,7 @@ pub(crate) struct ListEntities {
     editor: Entity<EditorView>,
     list_state: Entity<ListState<ItemListDelegate>>,
     selected_id_state: Entity<SelectedIdState>,
+    pub(crate) title_input_state: Entity<InputState>,
 }
 
 impl ListView {
@@ -70,11 +73,13 @@ impl ListView {
         let input_state = Self::build_input_state(window, cx);
         let list_state = Self::build_list_state(window, cx, focus_handle.clone());
         let editor = Self::build_editor_view(window, cx, selected_id_state.clone());
+        let title_input_state = Self::build_title_input_state(window, cx);
         ListEntities {
             input_state,
             editor,
             list_state,
             selected_id_state,
+            title_input_state,
         }
     }
 
@@ -100,6 +105,17 @@ impl ListView {
 
     fn build_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
         cx.new(|cx| InputState::new(window, cx).placeholder("Search for anything..."))
+    }
+
+    fn build_title_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+        cx.new(|cx| {
+            let mut input_state = InputState::new(window, cx);
+            input_state.set_editor_style(InputEditorStyle {
+                caret: cx.theme().caret,
+                ..Default::default()
+            });
+            input_state
+        })
     }
 
     fn build_editor_view(
@@ -161,6 +177,48 @@ impl ListView {
             cx.notify();
         });
 
+        let title_input_state_sub = cx.subscribe_in(
+            &entities.title_input_state,
+            window,
+            move |view, title_input_state, event: &InputEvent, _window, cx| {
+                if let InputEvent::Change = event {
+                    let Some(selected_id) = view.entities.selected_id_state.read(cx).selected_id
+                    else {
+                        return;
+                    };
+                    cx.update_global::<ItemStore, ()>(|store, cx| {
+                        let item = store.items.get_mut(&selected_id);
+                        if let Some(item) = item {
+                            item.name = title_input_state.read(cx).value();
+                        }
+                    });
+                    let title = title_input_state.read(cx).value();
+                    let store = ItemStore::get_mut(cx);
+                    let needs_new_receiver = match store.title_input_tx.get(&selected_id) {
+                        Some(tx) => tx.send(title.clone()).is_err(),
+                        None => true,
+                    };
+                    if needs_new_receiver {
+                        let repository = cx.global::<TitleRepository>().0.clone();
+                        InputPersistence::spawn(
+                            cx,
+                            selected_id,
+                            title.clone(),
+                            Field::Title,
+                            move |title: SharedString| {
+                                let repository = repository.clone();
+                                Box::pin(async move {
+                                    repository
+                                        .update_title(selected_id, title.to_string())
+                                        .await
+                                })
+                            },
+                        );
+                    }
+                }
+            },
+        );
+
         let selected_id_sub = cx.observe_in(
             &entities.selected_id_state,
             window,
@@ -175,6 +233,15 @@ impl ListView {
                 entities.list_state.update(cx, |state, cx| {
                     state.set_selected_index(selected_index, window, cx);
                 });
+                entities.title_input_state.update(cx, |state, cx| {
+                    selected_id.inspect(|id| {
+                        let item_maybe = ItemStore::get(cx).items.get(id);
+                        if let Some(item) = item_maybe {
+                            let title = item.name.clone();
+                            state.set_value(title, window, cx);
+                        }
+                    });
+                });
             },
         );
 
@@ -182,6 +249,7 @@ impl ListView {
             _input_sub: input_sub,
             _store_sub: store_sub,
             _selected_id_sub: selected_id_sub,
+            _title_input_state_sub: title_input_state_sub,
         }
     }
 }
@@ -190,6 +258,7 @@ struct ListSubscriptions {
     _input_sub: Subscription,
     _store_sub: Subscription,
     _selected_id_sub: Subscription,
+    _title_input_state_sub: Subscription,
 }
 
 struct ItemListDelegate {
@@ -299,7 +368,7 @@ impl Render for ListView {
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
                 let selected_id_state = this.entities.selected_id_state.clone();
-                let repository = cx.global::<AppRepository>().0.clone();
+                let repository = cx.global::<ItemRepository>().0.clone();
                 cx.spawn(async move |_this, cx| {
                     if let Err(err) = Self::add_empty_item(cx, repository, selected_id_state).await
                     {
@@ -370,9 +439,16 @@ impl Render for ListView {
                                                     .ghost(),
                                             ),
                                     )
-                                    .child(Input::new(&self.entities.input_state).prefix(
-                                        Icon::new(IconName::Search).small().text_color(muted_color),
-                                    )),
+                                    .child(
+                                        gpui_component::input::Input::new(
+                                            &self.entities.input_state,
+                                        )
+                                        .prefix(
+                                            Icon::new(IconName::Search)
+                                                .small()
+                                                .text_color(muted_color),
+                                        ),
+                                    ),
                             ),
                     )
                     .child(
@@ -385,10 +461,23 @@ impl Render for ListView {
             .child(
                 div()
                     .flex_1()
+                    .flex()
+                    .flex_col()
                     .min_w_0()
                     .min_h_0()
                     .overflow_hidden()
-                    .child(self.entities.editor.clone()),
+                    .child(
+                        InputBase::new("title-input")
+                            .child(Input::new(&self.entities.title_input_state))
+                            .w_full()
+                            .border_b(px(1.))
+                            .font_weight(FontWeight::BOLD)
+                            .p_2()
+                            .text_xl()
+                            .text_color(cx.theme().primary)
+                            .border_color(cx.theme().border),
+                    )
+                    .child(div().flex_1().min_h_0().child(self.entities.editor.clone())),
             )
     }
 }
@@ -398,17 +487,18 @@ mod tests {
     use std::sync::Arc;
 
     use crate::actions::{NewItem, SelectItem};
-    use crate::repository::AppRepository;
+    use crate::repository::{ItemRepository, TitleRepository};
     use crate::store::ItemStore;
     use crate::testutils::setup;
     use async_trait::async_trait;
     use chrono::Utc;
-    use gpui::TestAppContext;
+    use gpui::{SharedString, TestAppContext};
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
-    use oden_core::repository::ItemRepositoryTrait;
+    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use serde_json::json;
+    use tokio::sync::watch;
     use uuid::Uuid;
 
     struct MockItemRepository;
@@ -432,19 +522,21 @@ mod tests {
                 modified_at: now,
             })
         }
+    }
 
-        async fn update_item(&self, _id: Uuid, _content: String) -> Result<(), UpdateItemError> {
+    #[async_trait]
+    impl TitleRepositoryTrait for MockItemRepository {
+        async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
     }
 
     #[gpui::test]
     fn test_list_items_navigation(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(ItemRepository(repository.clone()));
         });
         let uuid = Uuid::new_v4();
         window
@@ -464,11 +556,10 @@ mod tests {
 
     #[gpui::test]
     fn test_new_item_creation(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(ItemRepository(repository));
         });
         window
             .update(cx, |root, window, cx| {
@@ -491,11 +582,10 @@ mod tests {
 
     #[gpui::test]
     fn test_selected_id_subscription(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
-            let repository: Arc<dyn ItemRepositoryTrait + Send + Sync> =
-                Arc::new(MockItemRepository);
-            cx.set_global(AppRepository(repository));
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(ItemRepository(repository));
         });
         let target_id = cx.update(|cx| {
             ItemStore::get(cx)
@@ -526,5 +616,105 @@ mod tests {
                 assert_eq!(selected_id, target_id);
             })
             .unwrap();
+    }
+    #[gpui::test]
+    fn test_title_update_on_selected_id_change(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
+        cx.update(|cx| {
+            let repository = Arc::new(MockItemRepository);
+
+            cx.set_global(TitleRepository(repository.clone()));
+
+            let target_id = ItemStore::get(cx)
+                .items
+                .keys()
+                .next()
+                .copied()
+                .expect("item store should contain one item");
+            window
+                .update(cx, |root, window, cx| {
+                    root.focus.focus(window, cx);
+                    window.dispatch_action(
+                        Box::new(SelectItem {
+                            selected_id: target_id,
+                        }),
+                        cx,
+                    );
+                })
+                .unwrap();
+        });
+        cx.run_until_parked();
+        window
+            .update(cx, move |root, _window, cx| {
+                let actual_value = root
+                    .list_view
+                    .read(cx)
+                    .entities
+                    .title_input_state
+                    .read(cx)
+                    .value();
+                let item = ItemStore::get(cx)
+                    .items
+                    .values()
+                    .next()
+                    .cloned()
+                    .expect("item store should contain one item");
+                assert_eq!(item.name, actual_value);
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_title_input_updates_selected_item_store(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
+        cx.update(|cx| {
+            let repository = Arc::new(MockItemRepository);
+            cx.set_global(TitleRepository(repository));
+        });
+        let target_id = cx.update(|cx| {
+            ItemStore::get(cx)
+                .items
+                .keys()
+                .next()
+                .copied()
+                .expect("item store should contain one item")
+        });
+        let (title_tx, _title_rx) = watch::channel(SharedString::from(""));
+        cx.update(|cx| {
+            ItemStore::get_mut(cx)
+                .title_input_tx
+                .insert(target_id, title_tx);
+        });
+        window
+            .update(cx, |root, window, cx| {
+                root.focus.focus(window, cx);
+                window.dispatch_action(
+                    Box::new(SelectItem {
+                        selected_id: target_id,
+                    }),
+                    cx,
+                );
+            })
+            .unwrap();
+        cx.run_until_parked();
+        window
+            .update(cx, |root, window, cx| {
+                let title_input_state = root.list_view.read(cx).entities.title_input_state.clone();
+                title_input_state.update(cx, |state, cx| {
+                    state.replace_all("Updated title", window, cx);
+                });
+            })
+            .unwrap();
+        cx.run_until_parked();
+        cx.update(|cx| {
+            assert_eq!(
+                ItemStore::get(cx)
+                    .items
+                    .get(&target_id)
+                    .expect("selected item should remain in the item store")
+                    .name,
+                "Updated title"
+            );
+        });
     }
 }
