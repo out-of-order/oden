@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/out-of-order/oden/compare/oden-v0.9.0...oden-v0.10.0) (2026-09-12)
+
+
+### Features
+
+* item title editing and persistence ([96bba3e](https://github.com/out-of-order/oden/commit/96bba3e1303e7413874231a064ba14e2f71f10a0))
+
 ## [0.9.0](https://github.com/out-of-order/oden/compare/oden-v0.8.0...oden-v0.9.0) (2026-09-06)
 
 
