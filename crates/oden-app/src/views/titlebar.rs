@@ -21,6 +21,7 @@ use crate::{
 
 pub(crate) struct Titlebar {
     _status_entity_sub: Subscription,
+    _persistence_sub: Subscription,
     persistence_status: PersistenceStatus,
 }
 
@@ -30,8 +31,13 @@ impl Titlebar {
             cx.observe_global_in::<AppStatus>(window, |_status_entity, _window, cx| {
                 cx.notify();
             });
+        let _persistence_sub =
+            cx.observe_global_in::<PersistencePerNote>(window, |_persistence, _window, cx| {
+                cx.notify();
+            });
         Self {
             _status_entity_sub,
+            _persistence_sub,
             persistence_status: PersistenceStatus::Idle,
         }
     }
@@ -127,22 +133,17 @@ impl Render for Titlebar {
 mod tests {
     use std::assert_matches;
     use std::sync::Arc;
-    use std::time::Duration;
 
-    use gpui::TestAppContext;
+    use gpui::{BorrowAppContext, TestAppContext};
     use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
     use oden_core::{entities::item, errors::UpdateItemError};
     use sea_orm::DbErr;
     use uuid::Uuid;
 
     use crate::appstatus::AppStatus;
-    use crate::persistence::PersistenceStatus;
+    use crate::persistence::{PersistencePerNote, PersistenceStatus};
     use crate::repository::{ItemRepository, TitleRepository};
-    use crate::{
-        actions::{NewItem, SelectItem},
-        store::ItemStore,
-        testutils::setup,
-    };
+    use crate::{actions::NewItem, testutils::setup};
 
     use async_trait::async_trait;
 
@@ -170,7 +171,7 @@ mod tests {
 
     #[gpui::test]
     fn test_titlebar_status_change_on_issues(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
         cx.update(|cx| {
             let failing_repository = Arc::new(FailingItemRepository {});
             cx.set_global::<TitleRepository>(TitleRepository(failing_repository.clone()));
@@ -202,42 +203,23 @@ mod tests {
 
     #[gpui::test]
     fn test_titlebar_persistence_status_failed(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
-        let failing_repository = Arc::new(FailingItemRepository {});
-        cx.set_global(ItemRepository(failing_repository.clone()));
-        cx.set_global(TitleRepository(failing_repository.clone()));
-        let target_id = cx.update(|cx| {
-            ItemStore::get(cx)
-                .items()
-                .keys()
-                .next()
-                .copied()
-                .expect("item store should contain at least one item")
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
+        let item_id = Uuid::new_v4();
+        cx.update(|cx| {
+            cx.update_global::<PersistencePerNote, ()>(|persistence_per_note, _cx| {
+                persistence_per_note
+                    .0
+                    .insert(item_id, PersistenceStatus::Failed);
+            });
         });
-        window
-            .update(cx, |root, window, cx| {
-                root.focus.focus(window, cx);
-                window.dispatch_action(
-                    Box::new(SelectItem {
-                        selected_id: target_id,
-                    }),
-                    cx,
-                );
-                let input_state = root.list_view.read(cx).editor().read(cx).input_state();
-                input_state.update(cx, move |input_state, cx| {
-                    input_state.set_value("test", window, cx);
-                });
-            })
-            .unwrap();
-        std::thread::sleep(Duration::from_millis(1200));
+        cx.run_until_parked();
         window
             .update(cx, |root, _window, cx| {
                 assert_matches!(
                     root.titlebar.read(cx).persistence_status,
-                    PersistenceStatus::Idle
+                    PersistenceStatus::Failed
                 );
             })
             .unwrap();
-        cx.run_until_parked();
     }
 }

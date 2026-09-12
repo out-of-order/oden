@@ -42,6 +42,7 @@ impl InputPersistence {
                 -> Pin<Box<dyn Future<Output = Result<(), UpdateItemError>> + Send + 'static>>,
     {
         let (tx, rx) = watch::channel(value.clone());
+        tx.send_replace(value);
         cx.update_global::<ItemStore, ()>(|store, _cx| {
             match updated_field {
                 Field::Title => store.title_input_tx.insert(item_id, tx),

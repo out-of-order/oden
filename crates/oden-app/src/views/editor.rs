@@ -99,11 +99,6 @@ impl EditorView {
     fn get_item_for_selected_id(cx: &mut Context<Self>, selected_id: Uuid) -> Option<Item> {
         ItemStore::get(cx).items().get(&selected_id).cloned()
     }
-
-    #[cfg(test)]
-    pub(crate) fn input_state(&self) -> Entity<EditorState> {
-        self.input_state.clone()
-    }
 }
 
 impl Render for EditorView {
@@ -180,7 +175,7 @@ mod tests {
 
     #[gpui::test]
     fn test_editor_updates_on_select(cx: &mut gpui::TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
             cx.set_global(ItemRepository(repository));

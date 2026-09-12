@@ -533,7 +533,7 @@ mod tests {
 
     #[gpui::test]
     fn test_list_items_navigation(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
             cx.set_global(ItemRepository(repository.clone()));
@@ -556,7 +556,7 @@ mod tests {
 
     #[gpui::test]
     fn test_new_item_creation(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
             cx.set_global(ItemRepository(repository));
@@ -582,7 +582,7 @@ mod tests {
 
     #[gpui::test]
     fn test_selected_id_subscription(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
             cx.set_global(ItemRepository(repository));
@@ -619,7 +619,7 @@ mod tests {
     }
     #[gpui::test]
     fn test_title_update_on_selected_id_change(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
 
@@ -666,7 +666,7 @@ mod tests {
 
     #[gpui::test]
     fn test_title_input_updates_selected_item_store(cx: &mut TestAppContext) {
-        let (window, _app_mode_state, _selected_id_state, _tokio_guard) = setup(cx);
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
         cx.update(|cx| {
             let repository = Arc::new(MockItemRepository);
             cx.set_global(TitleRepository(repository));
