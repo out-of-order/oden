@@ -82,7 +82,7 @@ impl Render for GraphView {
         }
         let positions = self.simulation.positions();
         let edges = self.simulation.edges();
-        div().w_full().h_full().child(
+        div().flex_none().min_w(px(360.0)).w_full().h_full().child(
             canvas(
                 move |_bounds, window, _cx| {
                     let edges: Vec<Path<Pixels>> = edges
