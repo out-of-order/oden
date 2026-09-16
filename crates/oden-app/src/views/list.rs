@@ -390,6 +390,7 @@ impl Render for ListView {
                     .w_1_5()
                     .border_r(px(1.0))
                     .border_color(border_color)
+                    .flex_none()
                     .flex()
                     .flex_col()
                     .child(
@@ -463,7 +464,6 @@ impl Render for ListView {
                     .flex_1()
                     .flex()
                     .flex_col()
-                    .min_w_0()
                     .min_h_0()
                     .overflow_hidden()
                     .child(

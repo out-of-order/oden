@@ -238,13 +238,16 @@ fn render_node<'a>(
         TaskItem(metadata) => div()
             .flex()
             .flex_row()
-            .items_center()
+            .items_start()
             .gap_2()
+            .w_full()
             .child(Checkbox::new("list-item-checkbox").checked(metadata.symbol.is_some()))
-            .children(
-                node.children()
-                    .map(|node| render_node(node, cx, render_cx))
-                    .collect::<Vec<_>>(),
+            .child(
+                div().flex_1().min_w_0().mt(-px(5.)).children(
+                    node.children()
+                        .map(|node| render_node(node, cx, render_cx))
+                        .collect::<Vec<_>>(),
+                ),
             )
             .into_any_element(),
         _ => div().into_any_element(),

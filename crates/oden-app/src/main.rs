@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::anyhow;
-use gpui::{App, AppContext, AssetSource, Entity, Result, SharedString, WindowOptions};
+use gpui::{App, AppContext, AssetSource, Entity, Result, SharedString, Size, WindowOptions, px};
 use gpui_component::{Root, Theme, ThemeRegistry, TitleBar};
 use rust_embed::RustEmbed;
 
@@ -65,6 +65,10 @@ async fn main() -> anyhow::Result<()> {
             setup_theme(cx);
             let window_options = WindowOptions {
                 titlebar: Some(TitleBar::title_bar_options()),
+                window_min_size: Some(Size {
+                    width: px(696.0),
+                    height: px(480.0),
+                }),
                 ..Default::default()
             };
             cx.spawn(async move |cx| {
