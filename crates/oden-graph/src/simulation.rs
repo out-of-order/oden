@@ -25,11 +25,13 @@ pub struct Simulation {
     pub forces: Vec<Box<dyn Force>>,
 }
 
+#[derive(Debug)]
 pub struct Graph {
     pub nodes: HashMap<Uuid, Node>,
     pub adjacency_list: HashMap<Uuid, Vec<Uuid>>,
 }
 
+#[derive(Debug)]
 pub struct Node {
     pub position: Point<f32>,
     pub velocity: Point<f32>,
