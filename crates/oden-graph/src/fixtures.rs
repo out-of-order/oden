@@ -62,3 +62,23 @@ pub fn construct_graph(size: i32, shape: fn(&[Uuid]) -> HashMap<Uuid, Vec<Uuid>>
         adjacency_list: shape(&ids),
     }
 }
+
+#[cfg(test)]
+fn zero_velocity_node(x: f32, y: f32) -> Node {
+    Node {
+        position: Point { x, y },
+        velocity: Point::default(),
+    }
+}
+
+#[cfg(test)]
+pub fn graph_with_positions(points: &[Point<f32>]) -> Graph {
+    let mut nodes = HashMap::<Uuid, Node>::new();
+    for point in points {
+        nodes.insert(Uuid::new_v4(), zero_velocity_node(point.x, point.y));
+    }
+    Graph {
+        nodes,
+        adjacency_list: HashMap::new(),
+    }
+}

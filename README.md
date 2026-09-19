@@ -1,6 +1,6 @@
 # Oden
 
-[![Test](https://github.com/Ovrflwd-Org/Oden/actions/workflows/ci.yml/badge.svg)](https://github.com/Ovrflwd-Org/Oden/actions/workflows/ci.yml) [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://www.rust-lang.org/) 
+[![Test](https://github.com/Ovrflwd-Org/Oden/actions/workflows/ci.yml/badge.svg)](https://github.com/Ovrflwd-Org/Oden/actions/workflows/ci.yml) [![Rust](https://img.shields.io/badge/rust-1.97.1%2B-orange.svg)](https://www.rust-lang.org/) 
 
 Oden is an open source, cross platform, knowledge base app for developers built with Zed's `gpui` and Longbridge's `gpui-kit`. 
 
