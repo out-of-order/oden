@@ -6,4 +6,5 @@ edition = "2024"
 [dependencies]
 comrak = "0.54"
 gpui.workspace = true
+uuid.workspace = true
 gpui-component.workspace = true

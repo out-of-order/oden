@@ -44,8 +44,3 @@ fn tags_from_json(tags: Value) -> Vec<SharedString> {
     }
     Vec::new()
 }
-
-pub struct Link {
-    from: uuid::Uuid,
-    to: uuid::Uuid,
-}

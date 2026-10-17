@@ -11,7 +11,10 @@ use sea_orm::{
 use url::Url;
 use uuid::Uuid;
 
-use crate::{entities::item, errors::DbError};
+use crate::{
+    entities::{item, link},
+    errors::DbError,
+};
 
 #[cfg(debug_assertions)]
 const DATABASE_FILE: &str = "oden-dev.db";
@@ -34,6 +37,7 @@ fn get_db_path() -> Result<PathBuf> {
 #[cfg(debug_assertions)]
 // seeds the local database with mock data in debug mode.
 async fn seed_data_db(db: &DatabaseConnection) -> Result<()> {
+    link::Entity::delete_many().exec(db).await?;
     item::Entity::delete_many().exec(db).await?;
     let now = Utc::now();
     let rows = vec![
@@ -97,6 +101,7 @@ pub async fn setup_database() -> Result<DatabaseConnection> {
     db.get_schema_registry(module_path!().split("::").next().unwrap());
     db.get_schema_builder()
         .register(item::Entity)
+        .register(link::Entity)
         .sync(&db)
         .await?;
 

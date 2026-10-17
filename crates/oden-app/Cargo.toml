@@ -7,6 +7,7 @@ edition = "2024"
 gpui-component.workspace = true
 gpui-base.workspace = true
 rust-embed = "8"
+lsp-types = "0.97"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 schemars = { version = "1.2.1", features = ["uuid1"] }
@@ -20,6 +21,8 @@ async-trait.workspace = true
 tokio.workspace = true
 uuid.workspace = true
 chrono.workspace = true
+tracing.workspace = true
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }
 sea-orm = { version = "2.0.0-rc", default-features = false }

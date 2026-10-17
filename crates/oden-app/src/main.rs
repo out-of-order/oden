@@ -3,6 +3,9 @@ use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::anyhow;
 use gpui::{App, AppContext, AssetSource, Entity, Result, SharedString, Size, WindowOptions, px};
+use gpui_component::input::{
+    AutoClosingPair, SyntaxContext, language_config::LanguageConfig, set_language_config,
+};
 use gpui_component::{Root, Theme, ThemeRegistry, TitleBar};
 use rust_embed::RustEmbed;
 
@@ -30,13 +33,14 @@ impl AssetSource for Assets {
 
 use crate::appstatus::AppStatus;
 use crate::persistence::PersistencePerNote;
-use crate::repository::{ContentRepository, ItemRepository, TitleRepository};
+use crate::repository::{ContentRepository, ItemRepository, LinkRepository, TitleRepository};
 use crate::state::{AppMode, SelectedIdState};
 use crate::{root::AppRoot, store::ItemStore};
 use oden_core::db::setup_database;
 
 mod actions;
 mod appstatus;
+mod completionprovider;
 #[cfg(debug_assertions)]
 mod fixtures;
 mod icons;
@@ -60,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
                 include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf").as_slice(),
             )]);
             gpui_component::init(cx);
+            setup_markdown_language_config(cx);
             AppStatus::init(cx);
             PersistencePerNote::init(cx);
             setup_theme(cx);
@@ -72,14 +77,16 @@ async fn main() -> anyhow::Result<()> {
                 ..Default::default()
             };
             cx.spawn(async move |cx| {
-                let repository = Arc::new(oden_core::repository::ItemRepository::new(db));
-                if let Err(err) = ItemStore::init(cx, &repository).await {
+                let repository = Arc::new(oden_core::repository::ItemRepository::new(db.clone()));
+                let link_repository = Arc::new(oden_core::repository::LinkRepository::new(db));
+                if let Err(err) = ItemStore::init(cx, &repository, link_repository.clone()).await {
                     eprintln!("failed to initialize ItemStore: {err:?}");
                     return;
                 }
                 ItemRepository::init(cx, ItemRepository(repository.clone()));
                 ContentRepository::init(cx, ContentRepository(repository.clone()));
                 TitleRepository::init(cx, TitleRepository(repository));
+                LinkRepository::init(cx, LinkRepository(link_repository));
                 cx.open_window(window_options, |window, cx| {
                     let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
                     let selected_id_state: Entity<SelectedIdState> =
@@ -94,8 +101,25 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+fn setup_markdown_language_config(cx: &mut App) {
+    set_language_config(
+        "markdown",
+        LanguageConfig::default().auto_closing_pairs(
+            [
+                AutoClosingPair::new("(", ")"),
+                AutoClosingPair::new("{", "}"),
+                AutoClosingPair::new("\"", "\""),
+                AutoClosingPair::new("'", "'"),
+            ]
+            .into_iter()
+            .map(|p| p.not_in([SyntaxContext::String, SyntaxContext::Comment])),
+        ),
+        cx,
+    );
+}
+
 fn setup_theme(cx: &mut App) {
-    let theme_name = SharedString::from("Gruvbox Dark");
+    let theme_name = SharedString::from("Everforest Dark");
     if let Err(err) = ThemeRegistry::watch_dir(PathBuf::from("./themes"), cx, move |cx| {
         if let Some(theme) = ThemeRegistry::global(cx).themes().get(&theme_name).cloned() {
             Theme::global_mut(cx).apply_config(&theme);

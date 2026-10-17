@@ -10,7 +10,6 @@ use gpui_component::{
 };
 use uuid::Uuid;
 
-#[cfg(debug_assertions)]
 use crate::views::graph::GraphView;
 use crate::{
     actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
@@ -26,7 +25,6 @@ pub struct AppRoot {
     pub(crate) selected_id_state: Entity<SelectedIdState>,
     pub(crate) titlebar: Entity<Titlebar>,
     pub(crate) list_view: Entity<ListView>,
-    #[cfg(debug_assertions)]
     pub(crate) graph_view: Entity<GraphView>,
     pub(crate) focus: FocusHandle,
     pub(crate) _state_sub: Subscription,
@@ -46,8 +44,7 @@ impl AppRoot {
             app_mode: app_mode.clone(),
             list_view: cx
                 .new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone())),
-            #[cfg(debug_assertions)]
-            graph_view: cx.new(|_| GraphView::new()),
+            graph_view: cx.new(GraphView::new),
             titlebar: cx.new(|cx| Titlebar::new(cx, window)),
             selected_id_state,
             focus: cx.focus_handle(),
@@ -201,12 +198,7 @@ impl AppRoot {
     fn render_mode(&self, mode: AppMode) -> AnyElement {
         match mode {
             AppMode::List => self.list_view.clone().into_any_element(),
-            AppMode::Graph => {
-                #[cfg(debug_assertions)]
-                return self.graph_view.clone().into_any_element();
-                #[cfg(not(debug_assertions))]
-                return SharedString::from(mode.to_string()).into_any_element();
-            }
+            AppMode::Graph => self.graph_view.clone().into_any_element(),
             _ => SharedString::from(mode.to_string()).into_any_element(),
         }
     }

@@ -14,6 +14,7 @@ use gpui_component::{
     list::{List, ListDelegate, ListItem, ListState},
     v_flex,
 };
+use oden_core::errors::PersistenceError;
 use oden_core::repository::ItemRepositoryTrait;
 
 use crate::{
@@ -211,6 +212,7 @@ impl ListView {
                                     repository
                                         .update_title(selected_id, title.to_string())
                                         .await
+                                        .map_err(PersistenceError::from)
                                 })
                             },
                         );
