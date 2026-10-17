@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/out-of-order/oden/compare/oden-v0.10.1...oden-v0.11.0) (2026-10-17)
+
+
+### Features
+
+* wiki ([#48](https://github.com/out-of-order/oden/issues/48)) ([8e44681](https://github.com/out-of-order/oden/commit/8e44681afa01f7d676a6c0e056e4cec3644640c5))
+
 ## [0.10.1](https://github.com/out-of-order/oden/compare/oden-v0.10.0...oden-v0.10.1) (2026-09-16)
 
 
