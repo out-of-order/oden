@@ -1,5 +1,5 @@
 use crate::simulation::{Graph, Node};
-use gpui::Point;
+use gpui::{Point, SharedString};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -14,6 +14,7 @@ fn make_nodes(size: i32) -> (HashMap<Uuid, Node>, Vec<Uuid>) {
             Node {
                 position: Point::default(),
                 velocity: Point::default(),
+                label: SharedString::default(),
             },
         );
     }
@@ -68,6 +69,7 @@ fn zero_velocity_node(x: f32, y: f32) -> Node {
     Node {
         position: Point { x, y },
         velocity: Point::default(),
+        label: SharedString::default(),
     }
 }
 

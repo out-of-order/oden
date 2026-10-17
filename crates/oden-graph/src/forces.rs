@@ -93,7 +93,7 @@ impl Force for LinkForce {
 mod tests {
     use std::collections::HashMap;
 
-    use gpui::Point;
+    use gpui::{Point, SharedString};
 
     use crate::{
         fixtures::{construct_graph, fully_connected},
@@ -127,6 +127,7 @@ mod tests {
                 Node {
                     position: source_node,
                     velocity: Point::default(),
+                    label: SharedString::default(),
                 },
             ),
             (
@@ -134,6 +135,7 @@ mod tests {
                 Node {
                     position: target_node,
                     velocity: Point::default(),
+                    label: SharedString::default(),
                 },
             ),
         ]);

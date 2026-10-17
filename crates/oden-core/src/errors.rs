@@ -25,3 +25,24 @@ pub enum UpdateItemError {
     #[error(transparent)]
     Db(#[from] sea_orm::DbErr),
 }
+
+#[derive(Debug, Error)]
+pub enum PersistenceError {
+    #[error(transparent)]
+    UpdateItem(#[from] UpdateItemError),
+
+    #[error(transparent)]
+    SyncLink(#[from] SyncLinkError),
+}
+
+#[derive(Debug, Error)]
+pub enum SyncLinkError {
+    #[error("source item was not found")]
+    SourceNotFound,
+
+    #[error("target item was not found")]
+    TargetNotFound,
+
+    #[error(transparent)]
+    Db(#[from] sea_orm::DbErr),
+}

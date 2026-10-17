@@ -1,7 +1,7 @@
 use crate::appstatus::{AppOperation, Field, Issue};
 use crate::store::ItemStore;
 use gpui::{BorrowAppContext, Context, Result, SharedString};
-use oden_core::errors::UpdateItemError;
+use oden_core::errors::PersistenceError;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -39,7 +39,7 @@ impl InputPersistence {
             + Fn(
                 SharedString,
             )
-                -> Pin<Box<dyn Future<Output = Result<(), UpdateItemError>> + Send + 'static>>,
+                -> Pin<Box<dyn Future<Output = Result<(), PersistenceError>> + Send + 'static>>,
     {
         let (tx, rx) = watch::channel(value.clone());
         tx.send_replace(value);
@@ -49,7 +49,7 @@ impl InputPersistence {
                 Field::Content => store.item_content_tx.insert(item_id, tx),
             };
         });
-        let (error_tx, mut error_rx) = tokio::sync::mpsc::unbounded_channel::<UpdateItemError>();
+        let (error_tx, mut error_rx) = tokio::sync::mpsc::unbounded_channel::<PersistenceError>();
         cx.spawn(async move |_this, cx| {
             while let Some(error_value) = error_rx.recv().await {
                 cx.update(|cx| {
@@ -87,7 +87,7 @@ impl InputValueWatcher {
     /// Published persistence state to a persistence channel.
     fn spawn<F>(
         mut rx: Receiver<SharedString>,
-        error_tx: UnboundedSender<UpdateItemError>,
+        error_tx: UnboundedSender<PersistenceError>,
         persistence_state_tx: UnboundedSender<PersistenceStatus>,
         save: F,
     ) where
@@ -96,7 +96,7 @@ impl InputValueWatcher {
             + Fn(
                 SharedString,
             )
-                -> Pin<Box<dyn Future<Output = Result<(), UpdateItemError>> + Send + 'static>>,
+                -> Pin<Box<dyn Future<Output = Result<(), PersistenceError>> + Send + 'static>>,
     {
         tokio::spawn(async move {
             loop {

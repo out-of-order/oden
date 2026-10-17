@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::ops::Range;
+use std::rc::Rc;
 
 use comrak::arena_tree::Node;
 use comrak::nodes::NodeValue::{
@@ -37,19 +38,28 @@ struct RenderingContext {
 
 /// parses a markdown document using comrak and returns a
 /// renderable gpui element
-pub fn render_document(document: &str, cx: &App) -> AnyElement {
+pub fn render_document(
+    document: &str,
+    cx: &App,
+    on_link_click: impl Fn(&str, &mut App, &mut Window) + 'static,
+) -> AnyElement {
     let arena = Arena::new();
     let mut options = Options::default();
     options.extension.tasklist = true;
     let root = parse_document(&arena, document, &options);
-    render_node(root, cx, RenderingContext::default())
+    let on_link_click = Rc::new(on_link_click);
+    render_node(root, cx, RenderingContext::default(), &on_link_click)
 }
 
-fn render_block_for_children<'a>(
+fn render_block_for_children<'a, F>(
     node: &'a Node<'a, RefCell<Ast>>,
     cx: &App,
     render_context: RenderingContext,
-) -> Vec<AnyElement> {
+    on_link_click: &Rc<F>,
+) -> Vec<AnyElement>
+where
+    F: Fn(&str, &mut App, &mut Window) + 'static,
+{
     let children = node.children().collect::<Vec<_>>();
     node.children()
         .enumerate()
@@ -58,7 +68,7 @@ fn render_block_for_children<'a>(
             let gap = if is_last { 0. } else { block_for_node(child) };
             div()
                 .pb(rems(gap))
-                .child(render_node(child, cx, render_context))
+                .child(render_node(child, cx, render_context, on_link_click))
                 .into_any_element()
         })
         .collect()
@@ -78,18 +88,27 @@ fn block_for_node(node: &Node<'_, RefCell<Ast>>) -> f32 {
 
 // recursively traverses the AST tree by using the children() method and maps
 // each child into a gpui element
-fn render_node<'a>(
+fn render_node<'a, F>(
     node: &'a Node<'a, RefCell<Ast>>,
     cx: &App,
     render_cx: RenderingContext,
-) -> AnyElement {
+    on_link_click: &Rc<F>,
+) -> AnyElement
+where
+    F: Fn(&str, &mut App, &mut Window) + 'static,
+{
     let theme = cx.theme();
     match &node.data().value {
         Document => div()
             .p_4()
             .gap_12()
             .size_full()
-            .children(render_block_for_children(node, cx, render_cx))
+            .children(render_block_for_children(
+                node,
+                cx,
+                render_cx,
+                on_link_click,
+            ))
             .into_any_element(),
         Heading(node_heading) => match node_heading.level {
             1 => div()
@@ -100,7 +119,7 @@ fn render_node<'a>(
                 .font_weight(FontWeight::BOLD)
                 .children(
                     node.children()
-                        .map(|node| render_node(node, cx, render_cx))
+                        .map(|node| render_node(node, cx, render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 )
                 .into_any_element(),
@@ -112,7 +131,7 @@ fn render_node<'a>(
                 .border_color(theme.border)
                 .children(
                     node.children()
-                        .map(|node| render_node(node, cx, render_cx))
+                        .map(|node| render_node(node, cx, render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 )
                 .into_any_element(),
@@ -124,14 +143,14 @@ fn render_node<'a>(
                 .font_weight(FontWeight::BOLD)
                 .children(
                     node.children()
-                        .map(|node| render_node(node, cx, render_cx))
+                        .map(|node| render_node(node, cx, render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 )
                 .into_any_element(),
             _ => div()
                 .children(
                     node.children()
-                        .map(|node| render_node(node, cx, render_cx))
+                        .map(|node| render_node(node, cx, render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 )
                 .into_any_element(),
@@ -161,13 +180,14 @@ fn render_node<'a>(
             let ranges: Vec<Range<usize>> = links.iter().map(|link| link.range.clone()).collect();
             let styled_text = StyledText::new(text).with_runs(runs);
             let text_layout = styled_text.layout().clone();
+            let on_link_click = on_link_click.clone();
             let inner = InteractiveText::new(
                 ElementId::Name(SharedString::from("md-paragraph")),
                 styled_text,
             )
-            .on_click(ranges, move |index, _window, cx| {
+            .on_click(ranges, move |index, window, cx| {
                 let link = &links[index];
-                cx.open_url(&link.href);
+                on_link_click(&link.href, cx, window);
             });
             CodeChipText {
                 inner,
@@ -221,7 +241,7 @@ fn render_node<'a>(
                 .bg(theme.muted)
                 .children(
                     node.children()
-                        .map(|node| render_node(node, cx, block_quote_render_cx))
+                        .map(|node| render_node(node, cx, block_quote_render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 )
                 .into_any_element()
@@ -231,7 +251,7 @@ fn render_node<'a>(
             .flex_col()
             .children(
                 node.children()
-                    .map(|node| render_node(node, cx, render_cx))
+                    .map(|node| render_node(node, cx, render_cx, on_link_click))
                     .collect::<Vec<_>>(),
             )
             .into_any_element(),
@@ -250,7 +270,7 @@ fn render_node<'a>(
                     // text wrappers should have flex_1, so text wraps to available width.
                     div().flex_1().w_full().min_w_0().children(
                         node.children()
-                            .map(|node| render_node(node, cx, render_cx))
+                            .map(|node| render_node(node, cx, render_cx, on_link_click))
                             .collect::<Vec<_>>(),
                     ),
                 )
@@ -266,13 +286,31 @@ fn render_node<'a>(
             .child(
                 div().flex_1().min_w_0().mt(-px(5.)).children(
                     node.children()
-                        .map(|node| render_node(node, cx, render_cx))
+                        .map(|node| render_node(node, cx, render_cx, on_link_click))
                         .collect::<Vec<_>>(),
                 ),
             )
             .into_any_element(),
         _ => div().into_any_element(),
     }
+}
+
+/// parses the links in the documents and returns them.
+pub fn parse_links(document: &str) -> Vec<String> {
+    let mut links = Vec::new();
+    let options = Options::default();
+    let arena = Arena::new();
+    let root = parse_document(&arena, document, &options);
+    for child in root.children() {
+        if let Paragraph = child.data().value {
+            for text_node in child.children() {
+                if let Link(node_link) = &text_node.data().value {
+                    links.push(node_link.url.clone());
+                }
+            }
+        }
+    }
+    links
 }
 
 // collect text segments, register text runs, and return one StyledText block.
