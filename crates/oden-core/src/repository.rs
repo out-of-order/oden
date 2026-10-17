@@ -1,21 +1,30 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, DatabaseConnection, DbErr, EntityTrait,
-    sea_query::value::prelude::serde_json::json,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
+    QueryFilter, sea_query::value::prelude::serde_json::json,
 };
+use std::collections::HashSet;
 use uuid::Uuid;
 
 use async_trait::async_trait;
 
 use crate::{
-    entities::item::{self},
-    errors::UpdateItemError,
+    entities::{
+        item::{self},
+        link,
+    },
+    errors::{SyncLinkError, UpdateItemError},
 };
 
 #[async_trait]
 pub trait ItemRepositoryTrait {
     async fn find_all(&self) -> Result<Vec<item::Model>, DbErr>;
     async fn create_item(&self) -> Result<item::Model, DbErr>;
+}
+
+#[async_trait]
+pub trait LinkRepositoryTrait {
+    async fn find_all(&self) -> Result<Vec<link::Model>, DbErr>;
 }
 
 #[async_trait]
@@ -26,6 +35,62 @@ pub trait ContentRepositoryTrait {
 #[async_trait]
 pub trait TitleRepositoryTrait {
     async fn update_title(&self, id: Uuid, title: String) -> Result<(), UpdateItemError>;
+}
+
+#[async_trait]
+pub trait SyncLinkRepositoryTrait {
+    async fn sync_links(&self, from: Uuid, targets: Vec<Uuid>) -> Result<(), SyncLinkError>;
+}
+
+pub struct LinkRepository {
+    db: DatabaseConnection,
+}
+
+impl LinkRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl LinkRepositoryTrait for LinkRepository {
+    async fn find_all(&self) -> Result<Vec<link::Model>, DbErr> {
+        link::Entity::find().all(&self.db).await
+    }
+}
+
+#[async_trait]
+impl SyncLinkRepositoryTrait for LinkRepository {
+    async fn sync_links(&self, from: Uuid, targets: Vec<Uuid>) -> Result<(), SyncLinkError> {
+        let existing: HashSet<Uuid> = link::Entity::find()
+            .filter(link::Column::SourceItemId.eq(from))
+            .all(&self.db)
+            .await?
+            .iter()
+            .map(|link| link.target_item_id)
+            .collect();
+        let desired: HashSet<Uuid> = targets.into_iter().collect();
+        let to_add = desired.difference(&existing).collect::<Vec<&Uuid>>();
+        let to_remove = existing.difference(&desired).collect::<Vec<&Uuid>>();
+        for target_id in to_add {
+            let link_to_insert = link::ActiveModel {
+                id: Set(Uuid::new_v4()),
+                source_item_id: Set(from),
+                target_item_id: Set(*target_id),
+            };
+            if let Err(e) = link_to_insert.insert(&self.db).await {
+                return Err(SyncLinkError::Db(e));
+            }
+        }
+        for target_id in to_remove {
+            link::Entity::delete_many()
+                .filter(link::Column::SourceItemId.eq(from))
+                .filter(link::Column::TargetItemId.eq(*target_id))
+                .exec(&self.db)
+                .await?;
+        }
+        Ok(())
+    }
 }
 
 pub struct ItemRepository {

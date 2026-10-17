@@ -1,4 +1,13 @@
-use comrak_gpui::render_document;
+use std::rc::Rc;
+
+use crate::appstatus::Field;
+use crate::completionprovider::LinkCompletionProvider;
+use crate::inputvaluewatcher::InputPersistence;
+use crate::models::Item;
+use crate::repository::{ContentRepository, LinkRepository};
+use crate::state::SelectedIdState;
+use crate::store::ItemStore;
+use comrak_gpui::{parse_links, render_document};
 use gpui::{
     AppContext, Context, Entity, ParentElement, Render, SharedString, Styled, Subscription, Window,
     div, px,
@@ -7,13 +16,6 @@ use gpui_component::ActiveTheme;
 use gpui_component::input::{Editor, EditorState, InputEvent};
 use gpui_component::scroll::ScrollableElement;
 use uuid::Uuid;
-
-use crate::appstatus::Field;
-use crate::inputvaluewatcher::InputPersistence;
-use crate::models::Item;
-use crate::repository::ContentRepository;
-use crate::state::SelectedIdState;
-use crate::store::ItemStore;
 
 pub struct EditorView {
     input_state: Entity<EditorState>,
@@ -36,6 +38,10 @@ impl EditorView {
                 // if the text is too long.
                 .soft_wrap(true)
                 .line_number(true)
+                .vim()
+        });
+        input_state.update(cx, |input_state, _cx| {
+            input_state.lsp_mut().completion_provider = Some(Rc::new(LinkCompletionProvider {}))
         });
         let _selected_id_state_sub = cx.observe_in(
             &selected_id_state,
@@ -64,23 +70,43 @@ impl EditorView {
                     if let Some(item) = store.items.get_mut(&selected_id) {
                         item.content = new_content.clone();
                     }
+                    let targets: Vec<Uuid> = parse_links(new_content.as_str())
+                        .iter()
+                        .filter_map(|link| {
+                            link.strip_prefix("oden://item/")
+                                .and_then(|id| Uuid::parse_str(id).ok())
+                        })
+                        .collect();
+                    store.sync_links(selected_id, targets.clone());
                     let needs_new_receiver = match store.item_content_tx.get(&selected_id) {
                         Some(tx) => tx.send(new_content.clone()).is_err(),
                         None => true,
                     };
                     if needs_new_receiver {
-                        let repository = cx.global::<ContentRepository>().0.clone();
+                        let content_repository = cx.global::<ContentRepository>().0.clone();
+                        let link_repository = cx.global::<LinkRepository>().0.clone();
                         InputPersistence::spawn(
                             cx,
                             selected_id,
                             new_content,
                             Field::Content,
                             move |content: SharedString| {
-                                let repository = repository.clone();
+                                let content_repository = content_repository.clone();
+                                let link_repository = link_repository.clone();
+
                                 Box::pin(async move {
-                                    repository
+                                    content_repository
                                         .update_content(selected_id, content.to_string())
-                                        .await
+                                        .await?;
+                                    let targets: Vec<Uuid> = parse_links(content.as_str())
+                                        .iter()
+                                        .filter_map(|link| {
+                                            link.strip_prefix("oden://item/")
+                                                .and_then(|id| Uuid::parse_str(id).ok())
+                                        })
+                                        .collect();
+                                    link_repository.sync_links(selected_id, targets).await?;
+                                    Ok(())
                                 })
                             },
                         );
@@ -105,6 +131,7 @@ impl Render for EditorView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl gpui::IntoElement {
         let content = self.input_state.read(cx).value();
         let theme = cx.theme();
+        let selected_id_state = self.selected_id_state.clone();
         div()
             .flex()
             .flex_row()
@@ -132,7 +159,24 @@ impl Render for EditorView {
                     div()
                         .size_full()
                         .overflow_y_scrollbar()
-                        .child(render_document(content.as_ref(), cx)),
+                        .child(render_document(
+                            content.as_ref(),
+                            cx,
+                            move |href, cx, _window| {
+                                if let Some(id) = href.strip_prefix("oden://item/") {
+                                    if let Ok(selected_id) = Uuid::parse_str(id) {
+                                        selected_id_state.update(cx, |state, cx| {
+                                            if state.selected_id != Some(selected_id) {
+                                                state.selected_id = Some(selected_id);
+                                                cx.notify();
+                                            }
+                                        });
+                                    }
+                                } else {
+                                    cx.open_url(href);
+                                }
+                            },
+                        )),
                 ),
             )
     }
