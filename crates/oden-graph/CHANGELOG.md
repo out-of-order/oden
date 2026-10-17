@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.3.0...oden-graph-v0.4.0) (2026-10-17)
+
+
+### Features
+
+* wiki ([#48](https://github.com/out-of-order/oden/issues/48)) ([8e44681](https://github.com/out-of-order/oden/commit/8e44681afa01f7d676a6c0e056e4cec3644640c5))
+
 ## [0.3.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.2.0...oden-graph-v0.3.0) (2026-09-19)
 
 
