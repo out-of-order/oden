@@ -1,6 +1,6 @@
 use std::{collections::HashMap, f32::consts::PI};
 
-use gpui::Point;
+use gpui::{Point, SharedString};
 use uuid::Uuid;
 
 use crate::forces::Force;
@@ -12,7 +12,7 @@ pub struct SimulationOptions {
     pub alpha_decay: f32,
     pub alpha_min: f32,
 
-    // inital radius and angles for position seeding
+    // initial radius and angles for position seeding
     pub initial_radius: f32,
     pub initial_angle: f32,
 }
@@ -35,6 +35,7 @@ pub struct Graph {
 pub struct Node {
     pub position: Point<f32>,
     pub velocity: Point<f32>,
+    pub label: SharedString,
 }
 
 impl Simulation {
@@ -64,7 +65,7 @@ impl Simulation {
         self
     }
 
-    fn initialize_nodes(&mut self) {
+    pub fn initialize_nodes(&mut self) {
         let ids: Vec<Uuid> = self.graph.nodes.keys().copied().collect();
         for (i, id) in ids.iter().enumerate() {
             // initialize node positions in a spiral
@@ -94,11 +95,11 @@ impl Simulation {
     }
 
     // returns an array containing the positions of all the nodes in the graph.
-    pub fn positions(&self) -> Vec<Point<f32>> {
+    pub fn nodes_render_data(&self) -> Vec<(SharedString, Point<f32>)> {
         self.graph
             .nodes
             .values()
-            .map(|node| node.position)
+            .map(|node| (node.label.clone(), node.position))
             .collect()
     }
 
@@ -125,7 +126,7 @@ impl Simulation {
 mod tests {
     use std::collections::HashMap;
 
-    use gpui::Point;
+    use gpui::{Point, SharedString};
     use uuid::Uuid;
 
     use crate::simulation::{Graph, Node, Simulation};
@@ -140,6 +141,7 @@ mod tests {
                 Node {
                     position: Point::default(),
                     velocity: Point::default(),
+                    label: SharedString::default(),
                 },
             );
         }
@@ -163,13 +165,13 @@ mod tests {
     fn test_node_positions_should_be_initialized() {
         let graph = construct_graph(1);
         let simulation = Simulation::new(graph);
-        let positions = &simulation.positions();
+        let positions = &simulation.nodes_render_data();
         let node = positions.first().unwrap();
         assert_eq!(
-            node.x,
+            node.1.x,
             simulation.options.initial_radius * f32::sqrt(2.) / 2.
         );
-        assert_eq!(node.y, 0.)
+        assert_eq!(node.1.y, 0.)
     }
 
     #[test]
