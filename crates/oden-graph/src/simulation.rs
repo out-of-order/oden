@@ -36,6 +36,10 @@ pub struct Node {
     pub position: Point<f32>,
     pub velocity: Point<f32>,
     pub label: SharedString,
+    // Collision radius used by `forces::CollideForce`. Callers that render
+    // labels (e.g. `oden-app`) should derive this from the rendered title
+    // size so wider titles keep more space around them.
+    pub radius: f32,
 }
 
 impl Simulation {
@@ -142,6 +146,7 @@ mod tests {
                     position: Point::default(),
                     velocity: Point::default(),
                     label: SharedString::default(),
+                    radius: 5.0,
                 },
             );
         }

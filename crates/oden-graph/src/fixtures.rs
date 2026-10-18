@@ -15,6 +15,7 @@ fn make_nodes(size: i32) -> (HashMap<Uuid, Node>, Vec<Uuid>) {
                 position: Point::default(),
                 velocity: Point::default(),
                 label: SharedString::default(),
+                radius: 5.0,
             },
         );
     }
@@ -70,6 +71,7 @@ fn zero_velocity_node(x: f32, y: f32) -> Node {
         position: Point { x, y },
         velocity: Point::default(),
         label: SharedString::default(),
+        radius: 5.0,
     }
 }
 

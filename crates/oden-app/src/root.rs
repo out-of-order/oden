@@ -129,12 +129,18 @@ impl AppRoot {
     }
 
     fn update_mode(&mut self, mode: AppMode, cx: &mut Context<Self>) {
-        self.app_mode.update(cx, |app_mode, cx| {
-            if *app_mode != mode {
-                *app_mode = mode;
-                cx.notify();
+        let changed = self.app_mode.update(cx, |app_mode, cx| {
+            if *app_mode == mode {
+                return false;
             }
-        })
+            *app_mode = mode;
+            cx.notify();
+            true
+        });
+        if changed && mode == AppMode::Graph {
+            self.graph_view
+                .update(cx, |graph_view, cx| graph_view.restart(cx));
+        }
     }
 
     fn update_selected_id(&mut self, selected_id: Uuid, cx: &mut Context<Self>) {
@@ -165,7 +171,7 @@ impl Render for AppRoot {
                 this.update_mode(AppMode::Search, cx)
             }))
             .on_action(cx.listener(|this, _action: &GraphMode, _window, cx| {
-                this.update_mode(AppMode::Graph, cx)
+                this.update_mode(AppMode::Graph, cx);
             }))
             .on_action(cx.listener(|this, _action: &Settings, _window, cx| {
                 this.update_mode(AppMode::Settings, cx)
