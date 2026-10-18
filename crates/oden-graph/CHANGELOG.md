@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.4.0...oden-graph-v0.5.0) (2026-10-18)
+
+
+### Features
+
+* many-body-force implementation ([#50](https://github.com/out-of-order/oden/issues/50)) ([1197392](https://github.com/out-of-order/oden/commit/1197392f8b649536b69e5b9660e8415b1844a566))
+
 ## [0.4.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.3.0...oden-graph-v0.4.0) (2026-10-17)
 
 
