@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gpui::Point;
 use uuid::Uuid;
 
-use crate::simulation::Graph;
+use crate::{quadtree::QuadTree, rng::Lcg, simulation::Graph};
 
 pub trait Force {
     // modifies the node.velocity by applying said force to the node.
@@ -89,6 +89,139 @@ impl Force for LinkForce {
     }
 }
 
+// ----- Many-Body Force ------
+// A Barnes-Hut approximated n-body force (repulsion by default, since
+// `strength` defaults negative), equivalent to d3-force's `forceManyBody`.
+pub struct ManyBodyForce {
+    pub strength: f32,
+    pub theta: f32,
+    pub distance_min: f32,
+    pub distance_max: f32,
+    strengths: HashMap<Uuid, f32>,
+    rng: Lcg,
+}
+
+impl ManyBodyForce {
+    pub fn new() -> Self {
+        Self {
+            strength: -30.,
+            theta: 0.9,
+            distance_min: 1.,
+            distance_max: f32::INFINITY,
+            strengths: HashMap::new(),
+            rng: Lcg::new(),
+        }
+    }
+
+    fn init_strengths(&mut self, nodes: &Graph) {
+        self.strengths = nodes.nodes.keys().map(|id| (*id, self.strength)).collect();
+    }
+}
+
+impl Default for ManyBodyForce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Force for ManyBodyForce {
+    fn apply_force(&mut self, alpha: f32, nodes: &mut Graph) {
+        if nodes.nodes.len() < 2 {
+            return;
+        }
+        self.init_strengths(nodes);
+
+        let mut tree = QuadTree::new(nodes);
+        tree.accumulate_charge(&self.strengths);
+
+        let theta2 = self.theta * self.theta;
+        let distance_min2 = self.distance_min * self.distance_min;
+        let distance_max2 = self.distance_max * self.distance_max;
+
+        let mut deltas: HashMap<Uuid, Point<f32>> = HashMap::with_capacity(nodes.nodes.len());
+        for (id, node) in nodes.nodes.iter() {
+            let delta = tree.apply_charge(
+                *id,
+                node.position,
+                &self.strengths,
+                theta2,
+                distance_min2,
+                distance_max2,
+                &mut self.rng,
+            );
+            deltas.insert(*id, delta);
+        }
+
+        for (id, delta) in deltas {
+            nodes.nodes.get_mut(&id).unwrap().velocity += delta * alpha;
+        }
+    }
+}
+
+// ----- Collide Force ------
+// Keeps nodes from overlapping by treating each one as a circle of
+// `Node::radius` and pushing overlapping pairs apart, equivalent to
+// d3-force's `forceCollide`. Note that, like d3's collide force, this is
+// *not* scaled by `alpha`: collisions should keep resolving at full
+// strength even as the simulation cools down.
+pub struct CollideForce {
+    pub strength: f32,
+    pub iterations: usize,
+    rng: Lcg,
+}
+
+impl CollideForce {
+    pub fn new() -> Self {
+        Self {
+            strength: 1.,
+            iterations: 1,
+            rng: Lcg::new(),
+        }
+    }
+}
+
+impl Default for CollideForce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Force for CollideForce {
+    fn apply_force(&mut self, _alpha: f32, nodes: &mut Graph) {
+        if nodes.nodes.len() < 2 {
+            return;
+        }
+        let radii: HashMap<Uuid, f32> = nodes
+            .nodes
+            .iter()
+            .map(|(id, node)| (*id, node.radius.max(0.0)))
+            .collect();
+
+        for _ in 0..self.iterations.max(1) {
+            let mut tree = QuadTree::new(nodes);
+            tree.accumulate_radius(&radii);
+
+            let mut deltas: HashMap<Uuid, Point<f32>> = HashMap::new();
+            for (id, node) in nodes.nodes.iter() {
+                let own_radius = radii.get(id).copied().unwrap_or(0.0);
+                tree.apply_collisions(
+                    *id,
+                    node.position,
+                    own_radius,
+                    &radii,
+                    self.strength,
+                    &mut self.rng,
+                    &mut deltas,
+                );
+            }
+
+            for (id, delta) in deltas {
+                nodes.nodes.get_mut(&id).unwrap().velocity += delta;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -97,7 +230,7 @@ mod tests {
 
     use crate::{
         fixtures::{construct_graph, fully_connected},
-        forces::{Force, LinkForce},
+        forces::{CollideForce, Force, LinkForce, ManyBodyForce},
         simulation::{Graph, Node},
     };
 
@@ -128,6 +261,7 @@ mod tests {
                     position: source_node,
                     velocity: Point::default(),
                     label: SharedString::default(),
+                    radius: 5.0,
                 },
             ),
             (
@@ -136,6 +270,7 @@ mod tests {
                     position: target_node,
                     velocity: Point::default(),
                     label: SharedString::default(),
+                    radius: 5.0,
                 },
             ),
         ]);
@@ -150,5 +285,118 @@ mod tests {
         assert_eq!(source.velocity, Point { x: 40., y: 0. });
         let target = nodes.nodes.get(&target_id).unwrap();
         assert_eq!(target.velocity, Point { x: -40., y: 0. });
+    }
+
+    #[test]
+    fn test_many_body_force_repels_nodes_apart() {
+        let (source_id, source_node) = (uuid::Uuid::new_v4(), Point { x: 0., y: 0. });
+        let (target_id, target_node) = (uuid::Uuid::new_v4(), Point { x: 10., y: 0. });
+        let nodes = HashMap::from([
+            (
+                source_id,
+                Node {
+                    position: source_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+            (
+                target_id,
+                Node {
+                    position: target_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+        ]);
+        let mut graph = Graph {
+            adjacency_list: HashMap::new(),
+            nodes,
+        };
+        let mut force = ManyBodyForce::default();
+        force.apply_force(1., &mut graph);
+        let source = graph.nodes.get(&source_id).unwrap();
+        let target = graph.nodes.get(&target_id).unwrap();
+        // default strength is negative (repulsion), so the two nodes should
+        // be pushed apart, away from each other.
+        assert!(source.velocity.x < 0.0);
+        assert!(target.velocity.x > 0.0);
+    }
+
+    #[test]
+    fn test_collide_force_pushes_overlapping_nodes_apart() {
+        let (source_id, source_node) = (uuid::Uuid::new_v4(), Point { x: 0., y: 0. });
+        let (target_id, target_node) = (uuid::Uuid::new_v4(), Point { x: 4., y: 0. });
+        let nodes = HashMap::from([
+            (
+                source_id,
+                Node {
+                    position: source_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+            (
+                target_id,
+                Node {
+                    position: target_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+        ]);
+        let mut graph = Graph {
+            adjacency_list: HashMap::new(),
+            nodes,
+        };
+        let mut force = CollideForce::default();
+        force.apply_force(1., &mut graph);
+        let source = graph.nodes.get(&source_id).unwrap();
+        let target = graph.nodes.get(&target_id).unwrap();
+        // the two radius-5 circles are only 4 apart (overlapping), so they
+        // should be pushed apart along the x axis, symmetrically.
+        assert!(source.velocity.x < 0.0);
+        assert!(target.velocity.x > 0.0);
+        assert_eq!(source.velocity.x, -target.velocity.x);
+    }
+
+    #[test]
+    fn test_collide_force_ignores_non_overlapping_nodes() {
+        let (source_id, source_node) = (uuid::Uuid::new_v4(), Point { x: 0., y: 0. });
+        let (target_id, target_node) = (uuid::Uuid::new_v4(), Point { x: 100., y: 0. });
+        let nodes = HashMap::from([
+            (
+                source_id,
+                Node {
+                    position: source_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+            (
+                target_id,
+                Node {
+                    position: target_node,
+                    velocity: Point::default(),
+                    label: SharedString::default(),
+                    radius: 5.0,
+                },
+            ),
+        ]);
+        let mut graph = Graph {
+            adjacency_list: HashMap::new(),
+            nodes,
+        };
+        let mut force = CollideForce::default();
+        force.apply_force(1., &mut graph);
+        let source = graph.nodes.get(&source_id).unwrap();
+        let target = graph.nodes.get(&target_id).unwrap();
+        assert_eq!(source.velocity, Point::default());
+        assert_eq!(target.velocity, Point::default());
     }
 }
