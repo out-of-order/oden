@@ -2597,7 +2597,7 @@ dependencies = [
 [[package]]
 name = "gpui-base"
 version = "0.7.3"
-source = "git+https://github.com/out-of-order/gpui-component?rev=e0d82a7#e0d82a7a7c6fa124bcbd0d10b50d87e45874a005"
+source = "git+https://github.com/out-of-order/gpui-component?rev=5838b2d#5838b2d92ee3631be676a8f7278fa0e92c86e2e6"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2637,7 +2637,7 @@ dependencies = [
 [[package]]
 name = "gpui-component"
 version = "0.7.3"
-source = "git+https://github.com/out-of-order/gpui-component?rev=e0d82a7#e0d82a7a7c6fa124bcbd0d10b50d87e45874a005"
+source = "git+https://github.com/out-of-order/gpui-component?rev=5838b2d#5838b2d92ee3631be676a8f7278fa0e92c86e2e6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2718,7 +2718,7 @@ dependencies = [
 [[package]]
 name = "gpui-component-macros"
 version = "0.7.3"
-source = "git+https://github.com/out-of-order/gpui-component?rev=e0d82a7#e0d82a7a7c6fa124bcbd0d10b50d87e45874a005"
+source = "git+https://github.com/out-of-order/gpui-component?rev=5838b2d#5838b2d92ee3631be676a8f7278fa0e92c86e2e6"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -2729,7 +2729,7 @@ dependencies = [
 [[package]]
 name = "gpui-kit-assets"
 version = "0.7.3"
-source = "git+https://github.com/out-of-order/gpui-component?rev=e0d82a7#e0d82a7a7c6fa124bcbd0d10b50d87e45874a005"
+source = "git+https://github.com/out-of-order/gpui-component?rev=5838b2d#5838b2d92ee3631be676a8f7278fa0e92c86e2e6"
 dependencies = [
  "anyhow",
  "gpui-pre",
