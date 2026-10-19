@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/out-of-order/oden/compare/oden-v0.12.0...oden-v0.13.0) (2026-10-19)
+
+
+### Features
+
+* syntax highlighting for code blocks ([#53](https://github.com/out-of-order/oden/issues/53)) ([55acdc9](https://github.com/out-of-order/oden/commit/55acdc9e9a323e018715ea61b29c080c98f58f1c))
+
 ## [0.12.0](https://github.com/out-of-order/oden/compare/oden-v0.11.0...oden-v0.12.0) (2026-10-18)
 
 

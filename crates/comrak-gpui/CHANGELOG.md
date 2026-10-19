@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.3.0...comrak-gpui-v0.4.0) (2026-10-19)
+
+
+### Features
+
+* syntax highlighting for code blocks ([#53](https://github.com/out-of-order/oden/issues/53)) ([55acdc9](https://github.com/out-of-order/oden/commit/55acdc9e9a323e018715ea61b29c080c98f58f1c))
+
 ## [0.3.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.2.1...comrak-gpui-v0.3.0) (2026-10-17)
 
 
