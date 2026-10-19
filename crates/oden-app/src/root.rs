@@ -113,7 +113,7 @@ impl AppRoot {
                         div()
                             .child(APP_VERSION)
                             .text_color(muted_color)
-                            .text_size(px(12.)),
+                            .text_size(px(8.)),
                     )
                     .child(
                         Button::new("settings")
