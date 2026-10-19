@@ -1278,7 +1278,7 @@ dependencies = [
 
 [[package]]
 name = "comrak-gpui"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "comrak",
  "gpui-component",
@@ -5002,7 +5002,7 @@ dependencies = [
 
 [[package]]
 name = "oden"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5027,7 +5027,7 @@ dependencies = [
 
 [[package]]
 name = "oden-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5041,7 +5041,7 @@ dependencies = [
 
 [[package]]
 name = "oden-graph"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "gpui-pre",
  "uuid",
