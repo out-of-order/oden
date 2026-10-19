@@ -209,8 +209,9 @@ where
             let mut literal = literal.clone();
             let _ = literal.pop();
             div()
-                .border_r_2()
-                .border_color(theme.border)
+                .border(px(0.5))
+                .border_color(theme.colors.border)
+                .rounded_lg()
                 .bg(theme.secondary)
                 .p_2()
                 .mt_2()
