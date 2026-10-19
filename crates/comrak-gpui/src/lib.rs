@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -15,7 +16,12 @@ use gpui::{
     ParentElement, Pixels, SharedString, Styled, StyledText, TextRun, Window, div, fill, px, rems,
 };
 use gpui_component::checkbox::Checkbox;
-use gpui_component::{ActiveTheme, Theme};
+use gpui_component::highlighter::SyntaxHighlighter;
+use gpui_component::{ActiveTheme, Rope, Theme};
+
+thread_local! {
+    static CODE_HIGHLIGHTERS: RefCell<HashMap<String, SyntaxHighlighter>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Clone, Default)]
 struct TextStyle {
@@ -208,6 +214,17 @@ where
             let literal = &code_block.literal;
             let mut literal = literal.clone();
             let _ = literal.pop();
+            let lang = code_block.info.split_whitespace().next().unwrap_or("");
+            let styles = CODE_HIGHLIGHTERS.with(|cache| {
+                let mut highlighter = cache.borrow_mut();
+                let highlighter = highlighter
+                    .entry(lang.to_string())
+                    .or_insert_with(|| SyntaxHighlighter::new(lang));
+                let text: &Rope = &Rope::from_str(&literal[..]);
+                highlighter.update(None, text, None);
+                highlighter.styles(&(0..literal.len()), cx.theme().highlight_theme.as_ref())
+            });
+
             div()
                 .border(px(0.5))
                 .border_color(theme.colors.border)
@@ -221,8 +238,7 @@ where
                 .justify_center()
                 .child(
                     div()
-                        // TODO: syntax highlighting for code blocks.
-                        .child(SharedString::from(literal.to_string()))
+                        .child(StyledText::new(literal.clone()).with_highlights(styles))
                         .font_family(theme.mono_font_family.clone())
                         .text_sm()
                         .text_color(theme.secondary_foreground),
