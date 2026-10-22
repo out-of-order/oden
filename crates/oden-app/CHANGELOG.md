@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/out-of-order/oden/compare/oden-v0.13.0...oden-v0.14.0) (2026-10-22)
+
+
+### Features
+
+* **oden-app:** toggle list ([#55](https://github.com/out-of-order/oden/issues/55)) ([42460e4](https://github.com/out-of-order/oden/commit/42460e47a0a9ed9ba61426f4d3cfacb84277ba0d))
+
 ## [0.13.0](https://github.com/out-of-order/oden/compare/oden-v0.12.0...oden-v0.13.0) (2026-10-19)
 
 
