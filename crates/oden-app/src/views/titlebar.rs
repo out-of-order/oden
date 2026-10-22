@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, Context, CursorStyle, IntoElement, ParentElement, Render, SharedString, Styled,
-    Subscription, Window, div,
+    AnyElement, AppContext, Context, CursorStyle, Entity, IntoElement, ParentElement, Render,
+    SharedString, Styled, Subscription, Window, div,
 };
 use gpui_component::{
     ActiveTheme, Icon, TitleBar,
@@ -23,10 +23,15 @@ pub(crate) struct Titlebar {
     _status_entity_sub: Subscription,
     _persistence_sub: Subscription,
     persistence_status: PersistenceStatus,
+    show_list: Entity<bool>,
 }
 
 impl Titlebar {
-    pub(crate) fn new(cx: &mut Context<Self>, window: &mut Window) -> Self {
+    pub(crate) fn new(
+        cx: &mut Context<Self>,
+        window: &mut Window,
+        show_list: Entity<bool>,
+    ) -> Self {
         let _status_entity_sub =
             cx.observe_global_in::<AppStatus>(window, |_status_entity, _window, cx| {
                 cx.notify();
@@ -38,6 +43,7 @@ impl Titlebar {
         Self {
             _status_entity_sub,
             _persistence_sub,
+            show_list,
             persistence_status: PersistenceStatus::Idle,
         }
     }
@@ -57,7 +63,10 @@ impl Titlebar {
         let muted = cx.theme().muted_foreground;
         self.compute_persistence_status(cx);
         match self.persistence_status {
-            Idle => Label::new("synced").text_color(muted).into_any_element(),
+            Idle => Label::new("synced")
+                .text_sm()
+                .text_color(muted)
+                .into_any_element(),
             Saving => h_flex()
                 .child(Spinner::new().color(muted))
                 .child(Label::new("syncing").text_color(muted))
@@ -106,24 +115,47 @@ impl Render for Titlebar {
         } else {
             (IconName::Close, red)
         };
+        let show_list_entity = self.show_list.clone();
+        let show_list_icon = if *self.show_list.read(cx) {
+            IconName::ShowList
+        } else {
+            IconName::HideList
+        };
         TitleBar::new()
             // render the status of the app.
             .pr_4()
             .child(
-                h_flex().gap_2().child(SharedString::from("Oden")).child(
-                    Button::new("issues")
-                        .cursor(CursorStyle::PointingHand)
-                        // TODO: Navigate to a file showing all the issues.
-                        .tooltip("check issue logs")
-                        .h_3_4()
-                        .ghost()
-                        .flex()
-                        .flex_row()
-                        .gap_2()
-                        .items_center()
-                        .child(Icon::new(icon_name).text_color(color))
-                        .child(Label::new(status_message).text_color(muted)),
-                ),
+                h_flex()
+                    .gap_2()
+                    .child(div().child(SharedString::from("oden")).text_sm())
+                    .child(
+                        Button::new("issues")
+                            .cursor(CursorStyle::PointingHand)
+                            // TODO: Navigate to a file showing all the issues.
+                            .tooltip("check issue logs")
+                            .h_3_4()
+                            .ghost()
+                            .flex()
+                            .flex_row()
+                            .gap_2()
+                            .items_center()
+                            .child(Icon::new(icon_name).text_color(color))
+                            .child(Label::new(status_message).text_color(muted)),
+                    )
+                    .child(
+                        Button::new("toggle_list")
+                            .h_3_4()
+                            .ghost()
+                            .tooltip("toggle item list")
+                            .cursor(CursorStyle::PointingHand)
+                            .child(Icon::new(show_list_icon).text_sm().text_color(muted))
+                            .on_click(move |_, _, cx| {
+                                cx.update_entity(&show_list_entity, |show_list, cx| {
+                                    *show_list = !*show_list;
+                                    cx.notify();
+                                })
+                            }),
+                    ),
             )
             .child(self.render_persistence(cx))
     }
