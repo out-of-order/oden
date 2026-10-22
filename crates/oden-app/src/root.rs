@@ -37,15 +37,17 @@ impl AppRoot {
         window: &mut gpui::Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let list_view =
+            cx.new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone()));
+        let show_list = list_view.read(cx).entities.show_list_state.clone();
         Self {
             _state_sub: cx.observe(&app_mode, |_, _, cx| {
                 cx.notify();
             }),
             app_mode: app_mode.clone(),
-            list_view: cx
-                .new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone())),
+            list_view,
             graph_view: cx.new(GraphView::new),
-            titlebar: cx.new(|cx| Titlebar::new(cx, window)),
+            titlebar: cx.new(|cx| Titlebar::new(cx, window, show_list)),
             selected_id_state,
             focus: cx.focus_handle(),
         }
@@ -113,7 +115,7 @@ impl AppRoot {
                         div()
                             .child(APP_VERSION)
                             .text_color(muted_color)
-                            .text_size(px(8.)),
+                            .text_size(px(10.)),
                     )
                     .child(
                         Button::new("settings")
