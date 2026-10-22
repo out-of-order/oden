@@ -3,7 +3,7 @@ use std::sync::Arc;
 use gpui::{
     AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand, Entity,
     FocusHandle, FontWeight, InteractiveElement, ParentElement, Render, SharedString, Styled,
-    Subscription, Window, div, px,
+    Subscription, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_base::{Input, InputBase, input::InputEditorStyle};
 use gpui_component::{
@@ -40,6 +40,7 @@ pub(crate) struct ListEntities {
     editor: Entity<EditorView>,
     list_state: Entity<ListState<ItemListDelegate>>,
     selected_id_state: Entity<SelectedIdState>,
+    pub(crate) show_list_state: Entity<bool>,
     pub(crate) title_input_state: Entity<InputState>,
 }
 
@@ -75,12 +76,14 @@ impl ListView {
         let list_state = Self::build_list_state(window, cx, focus_handle.clone());
         let editor = Self::build_editor_view(window, cx, selected_id_state.clone());
         let title_input_state = Self::build_title_input_state(window, cx);
+        let show_list_state = Self::build_show_list_state(cx);
         ListEntities {
             input_state,
             editor,
             list_state,
             selected_id_state,
             title_input_state,
+            show_list_state,
         }
     }
 
@@ -117,6 +120,10 @@ impl ListView {
             });
             input_state
         })
+    }
+
+    fn build_show_list_state(cx: &mut Context<Self>) -> Entity<bool> {
+        cx.new(|_| true)
     }
 
     fn build_editor_view(
@@ -366,6 +373,7 @@ impl Render for ListView {
         let border_color = theme.border;
         let muted_color = theme.muted_foreground;
         let focus = self.focus_handle.clone();
+        let show_list = self.entities.show_list_state.read(cx);
         div()
             .track_focus(&self.focus_handle)
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
@@ -395,6 +403,7 @@ impl Render for ListView {
                     .flex_none()
                     .flex()
                     .flex_col()
+                    .when(!*show_list, |el| el.hidden())
                     .child(
                         div()
                             .w_full()

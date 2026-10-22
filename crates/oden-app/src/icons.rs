@@ -12,6 +12,8 @@ pub enum IconName {
     Close,
     Pencil,
     Check,
+    ShowList,
+    HideList,
 }
 
 impl IconNamed for IconName {
@@ -26,6 +28,8 @@ impl IconNamed for IconName {
             IconName::Close => "icons/window-close.svg",
             IconName::Pencil => "icons/pencil.svg",
             IconName::Check => "icons/check.svg",
+            IconName::HideList => "icons/hide-list.svg",
+            IconName::ShowList => "icons/show-list.svg",
         }
         .into()
     }
