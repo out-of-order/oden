@@ -71,8 +71,7 @@ impl AppRoot {
     }
 
     fn render_sidebar(&self, cx: &mut gpui::Context<Self>) -> impl IntoElement + use<> {
-        let border_color = cx.theme().border;
-        let sidebar_bg = cx.theme().sidebar;
+        let sidebar_bg = cx.theme().background;
         let muted_color = cx.theme().muted_foreground;
 
         let icon_rail = vec![
@@ -90,9 +89,7 @@ impl AppRoot {
             .flex_shrink_0()
             .flex()
             .flex_col()
-            .border_color(border_color)
             .bg(sidebar_bg)
-            .border_r(px(1.0))
             .child(
                 div()
                     .flex()
@@ -197,7 +194,7 @@ impl Render for AppRoot {
                     .overflow_hidden()
                     .bg(bg)
                     .child(sidebar)
-                    .child(self.render_mode(*mode)),
+                    .child(div().w_full().h_full().p_1().child(self.render_mode(*mode))),
             )
     }
 }

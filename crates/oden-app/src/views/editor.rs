@@ -136,16 +136,17 @@ impl Render for EditorView {
             .flex()
             .flex_row()
             .size_full()
+            .p_1()
+            .gap_1()
             .overflow_hidden()
             .child(
                 div()
-                    // 50% split when we set flex_1 with two children.
                     .flex_1()
-                    // min_w_0 so width does not interfere with the split.
                     .w_0()
                     .min_w_0()
                     .overflow_hidden()
-                    .border_r(px(1.))
+                    .rounded_lg()
+                    .border(px(1.))
                     .border_color(theme.border)
                     .child(
                         Editor::new(&self.input_state)
@@ -155,29 +156,37 @@ impl Render for EditorView {
                     ),
             )
             .child(
-                div().flex_1().w_0().min_w_0().overflow_hidden().child(
-                    div()
-                        .size_full()
-                        .overflow_y_scrollbar()
-                        .child(render_document(
-                            content.as_ref(),
-                            cx,
-                            move |href, cx, _window| {
-                                if let Some(id) = href.strip_prefix("oden://item/") {
-                                    if let Ok(selected_id) = Uuid::parse_str(id) {
-                                        selected_id_state.update(cx, |state, cx| {
-                                            if state.selected_id != Some(selected_id) {
-                                                state.selected_id = Some(selected_id);
-                                                cx.notify();
-                                            }
-                                        });
+                div()
+                    .flex_1()
+                    .w_0()
+                    .rounded_lg()
+                    .border(px(1.))
+                    .border_color(theme.border)
+                    .min_w_0()
+                    .overflow_hidden()
+                    .child(
+                        div()
+                            .size_full()
+                            .overflow_y_scrollbar()
+                            .child(render_document(
+                                content.as_ref(),
+                                cx,
+                                move |href, cx, _window| {
+                                    if let Some(id) = href.strip_prefix("oden://item/") {
+                                        if let Ok(selected_id) = Uuid::parse_str(id) {
+                                            selected_id_state.update(cx, |state, cx| {
+                                                if state.selected_id != Some(selected_id) {
+                                                    state.selected_id = Some(selected_id);
+                                                    cx.notify();
+                                                }
+                                            });
+                                        }
+                                    } else {
+                                        cx.open_url(href);
                                     }
-                                } else {
-                                    cx.open_url(href);
-                                }
-                            },
-                        )),
-                ),
+                                },
+                            )),
+                    ),
             )
     }
 }
