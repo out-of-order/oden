@@ -124,6 +124,8 @@ impl Render for Titlebar {
         TitleBar::new()
             // render the status of the app.
             .pr_4()
+            .bg(cx.theme().background)
+            .border_0()
             .child(
                 h_flex()
                     .gap_2()
