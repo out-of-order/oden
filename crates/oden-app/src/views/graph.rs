@@ -207,6 +207,9 @@ impl Render for GraphView {
             .flex_1()
             .min_w(px(360.0))
             .h_full()
+            .border(px(1.))
+            .rounded_lg()
+            .border_color(cx.theme().border)
             .overflow_hidden()
             .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, window, cx| {
                 let pixel_delta = event.delta.pixel_delta(window.line_height());
