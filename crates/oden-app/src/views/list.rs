@@ -395,11 +395,13 @@ impl Render for ListView {
             .h_full()
             .flex_row()
             .flex()
+            .gap_1()
             .child(
                 div()
                     .w_1_5()
-                    .border_r(px(1.0))
+                    .border(px(1.0))
                     .border_color(border_color)
+                    .rounded_lg()
                     .flex_none()
                     .flex()
                     .flex_col()
@@ -411,8 +413,8 @@ impl Render for ListView {
                             .flex_row()
                             .justify_center()
                             .items_center()
-                            .border_b(px(1.0))
-                            .border_color(border_color)
+                            //  .border_b(px(1.0))
+                            // .border_color(border_color)
                             .p_2()
                             .child(
                                 div()
@@ -480,10 +482,8 @@ impl Render for ListView {
                     .child(
                         InputBase::new("title-input")
                             .child(Input::new(&self.entities.title_input_state))
-                            .w_full()
-                            .border_b(px(1.))
-                            .font_weight(FontWeight::BOLD)
                             .p_2()
+                            .font_weight(FontWeight::BOLD)
                             .text_xl()
                             .text_color(cx.theme().primary)
                             .border_color(cx.theme().border),
