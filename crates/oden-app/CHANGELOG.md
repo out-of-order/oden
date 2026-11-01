@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/out-of-order/oden/compare/oden-v0.14.0...oden-v0.15.0) (2026-11-01)
+
+
+### Features
+
+* **oden-app:** ui redesign ([#57](https://github.com/out-of-order/oden/issues/57)) ([fb0ec4e](https://github.com/out-of-order/oden/commit/fb0ec4e50532c4c475076912d069914728301bee))
+
 ## [0.14.0](https://github.com/out-of-order/oden/compare/oden-v0.13.0...oden-v0.14.0) (2026-10-22)
 
 
