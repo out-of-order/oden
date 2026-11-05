@@ -2,7 +2,9 @@ use std::sync::Arc;
 use std::{borrow::Cow, path::PathBuf};
 
 use anyhow::anyhow;
-use gpui::{App, AppContext, AssetSource, Entity, Result, SharedString, Size, WindowOptions, px};
+use gpui::{
+    App, AppContext, AssetSource, Entity, KeyBinding, Result, SharedString, Size, WindowOptions, px,
+};
 use gpui_component::input::{
     AutoClosingPair, SyntaxContext, language_config::LanguageConfig, set_language_config,
 };
@@ -31,9 +33,12 @@ impl AssetSource for Assets {
     }
 }
 
+use crate::actions::DeleteItem;
 use crate::appstatus::AppStatus;
 use crate::persistence::PersistencePerNote;
-use crate::repository::{ContentRepository, ItemRepository, LinkRepository, TitleRepository};
+use crate::repository::{
+    ContentRepository, DeleteItemRepository, ItemRepository, LinkRepository, TitleRepository,
+};
 use crate::state::{AppMode, SelectedIdState};
 use crate::{root::AppRoot, store::ItemStore};
 use oden_core::db::setup_database;
@@ -63,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
             let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(
                 include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf").as_slice(),
             )]);
+            cx.bind_keys([KeyBinding::new("cmd-backspace", DeleteItem, Some("LIST"))]);
             gpui_component::init(cx);
             setup_markdown_language_config(cx);
             AppStatus::init(cx);
@@ -78,6 +84,8 @@ async fn main() -> anyhow::Result<()> {
             };
             cx.spawn(async move |cx| {
                 let repository = Arc::new(oden_core::repository::ItemRepository::new(db.clone()));
+                let delete_item_repository =
+                    Arc::new(oden_core::repository::DeleteItemRepository::new(db.clone()));
                 let link_repository = Arc::new(oden_core::repository::LinkRepository::new(db));
                 if let Err(err) = ItemStore::init(cx, &repository, link_repository.clone()).await {
                     eprintln!("failed to initialize ItemStore: {err:?}");
@@ -87,6 +95,7 @@ async fn main() -> anyhow::Result<()> {
                 ContentRepository::init(cx, ContentRepository(repository.clone()));
                 TitleRepository::init(cx, TitleRepository(repository));
                 LinkRepository::init(cx, LinkRepository(link_repository));
+                DeleteItemRepository::init(cx, DeleteItemRepository(delete_item_repository));
                 cx.open_window(window_options, |window, cx| {
                     let app_mode: Entity<AppMode> = cx.new(|_| AppMode::List);
                     let selected_id_state: Entity<SelectedIdState> =
