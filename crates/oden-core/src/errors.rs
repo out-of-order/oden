@@ -36,6 +36,15 @@ pub enum PersistenceError {
 }
 
 #[derive(Debug, Error)]
+pub enum DeleteItemError {
+    #[error("item to delete was not found")]
+    NotFound,
+
+    #[error(transparent)]
+    Db(#[from] sea_orm::DbErr),
+}
+
+#[derive(Debug, Error)]
 pub enum SyncLinkError {
     #[error("source item was not found")]
     SourceNotFound,
