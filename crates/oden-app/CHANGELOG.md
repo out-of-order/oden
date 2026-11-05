@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/out-of-order/oden/compare/oden-v0.15.0...oden-v0.16.0) (2026-11-05)
+
+
+### Features
+
+* item deletion in list mode ([#59](https://github.com/out-of-order/oden/issues/59)) ([2748719](https://github.com/out-of-order/oden/commit/27487198d02463d3c4648c93ae4173b7f80a21ec))
+
 ## [0.15.0](https://github.com/out-of-order/oden/compare/oden-v0.14.0...oden-v0.15.0) (2026-11-01)
 
 
