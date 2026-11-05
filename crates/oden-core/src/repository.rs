@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, sea_query::value::prelude::serde_json::json,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, DeleteResult,
+    EntityTrait, ExprTrait, ModelTrait, QueryFilter, sea_query::value::prelude::serde_json::json,
 };
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -13,13 +13,18 @@ use crate::{
         item::{self},
         link,
     },
-    errors::{SyncLinkError, UpdateItemError},
+    errors::{DeleteItemError, SyncLinkError, UpdateItemError},
 };
 
 #[async_trait]
 pub trait ItemRepositoryTrait {
     async fn find_all(&self) -> Result<Vec<item::Model>, DbErr>;
     async fn create_item(&self) -> Result<item::Model, DbErr>;
+}
+
+#[async_trait]
+pub trait DeleteItemRepositoryTrait {
+    async fn delete_item(&self, item_id: Uuid) -> Result<DeleteResult, DeleteItemError>;
 }
 
 #[async_trait]
@@ -49,6 +54,34 @@ pub struct LinkRepository {
 impl LinkRepository {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
+    }
+}
+
+pub struct DeleteItemRepository {
+    db: DatabaseConnection,
+}
+
+impl DeleteItemRepository {
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl DeleteItemRepositoryTrait for DeleteItemRepository {
+    async fn delete_item(&self, item_id: Uuid) -> Result<DeleteResult, DeleteItemError> {
+        let Some(to_delete) = item::Entity::find_by_id(item_id).one(&self.db).await? else {
+            return Err(DeleteItemError::NotFound);
+        };
+        link::Entity::delete_many()
+            .filter(
+                link::Column::SourceItemId
+                    .eq(item_id)
+                    .or(link::Column::TargetItemId.eq(item_id)),
+            )
+            .exec(&self.db)
+            .await?;
+        Ok(to_delete.delete(&self.db).await?)
     }
 }
 

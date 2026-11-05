@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use gpui::{
     AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand, Entity,
-    FocusHandle, FontWeight, InteractiveElement, ParentElement, Render, SharedString, Styled,
-    Subscription, Window, div, prelude::FluentBuilder, px,
+    FocusHandle, FontWeight, InteractiveElement, ParentElement, ReadGlobal, Render, SharedString,
+    Styled, Subscription, Window, div, prelude::FluentBuilder, px,
 };
 use gpui_base::{Input, InputBase, input::InputEditorStyle};
 use gpui_component::{
@@ -12,18 +12,19 @@ use gpui_component::{
     input::{InputEvent, InputState},
     label::Label,
     list::{List, ListDelegate, ListItem, ListState},
+    menu::ContextMenuExt,
     v_flex,
 };
 use oden_core::errors::PersistenceError;
-use oden_core::repository::ItemRepositoryTrait;
+use oden_core::repository::{DeleteItemRepositoryTrait, ItemRepositoryTrait};
 
 use crate::{
     ItemStore,
-    actions::{self, NewItem, SelectItem},
+    actions::{self, DeleteItem, NewItem, SelectItem},
     appstatus::{AppOperation, AppStatus, Field, Issue},
     icons::IconName,
     inputvaluewatcher::InputPersistence,
-    repository::{ItemRepository, TitleRepository},
+    repository::{DeleteItemRepository, ItemRepository, TitleRepository},
     state::SelectedIdState,
 };
 use crate::{models::Item, views::editor::EditorView};
@@ -85,6 +86,23 @@ impl ListView {
             title_input_state,
             show_list_state,
         }
+    }
+
+    async fn delete_item(
+        cx: &mut AsyncApp,
+        repository: Arc<dyn DeleteItemRepositoryTrait + Send + Sync>,
+        selected_id_state: Entity<SelectedIdState>,
+    ) -> anyhow::Result<()> {
+        let Some(selected_id) = cx.update(|cx| selected_id_state.read(cx).selected_id) else {
+            return Ok(());
+        };
+        repository.as_ref().delete_item(selected_id).await?;
+        cx.update(|cx| {
+            cx.update_global::<ItemStore, _>(|store, _app| {
+                store.items.remove(&selected_id);
+            })
+        });
+        Ok(())
     }
 
     async fn add_empty_item(
@@ -376,6 +394,7 @@ impl Render for ListView {
         let show_list = self.entities.show_list_state.read(cx);
         div()
             .track_focus(&self.focus_handle)
+            .key_context("LIST")
             .on_action(cx.listener(move |this, _action: &NewItem, _window, cx| {
                 let selected_id_state = this.entities.selected_id_state.clone();
                 let repository = cx.global::<ItemRepository>().0.clone();
@@ -387,6 +406,45 @@ impl Render for ListView {
                             state.issues.insert(AppOperation::CreateNewItem, new_issue);
                         });
                         eprintln!("failed to add item: {err}");
+                    }
+                })
+                .detach();
+            }))
+            .on_action(cx.listener(move |this, _action: &DeleteItem, _window, cx| {
+                let selected_id_state = this.entities.selected_id_state.clone();
+                let delete_item_repository = cx.global::<DeleteItemRepository>().0.clone();
+                cx.spawn(async move |_this, cx| {
+                    if let Err(err) =
+                        Self::delete_item(cx, delete_item_repository, selected_id_state.clone())
+                            .await
+                    {
+                        cx.update_global::<AppStatus, ()>(|state, cx| {
+                            let new_issue = Issue::new(err.to_string());
+                            let selected_id =
+                                selected_id_state.read(cx).selected_id.unwrap_or_default();
+                            state
+                                .issues
+                                .insert(AppOperation::DeleteItem(selected_id), new_issue);
+                        });
+                        cx.refresh();
+                    } else {
+                        // remove issue related to this note deletion if any.
+                        cx.update_global::<AppStatus, ()>(|state, cx| {
+                            let selected_id =
+                                selected_id_state.read(cx).selected_id.unwrap_or_default();
+                            state.issues.remove(&AppOperation::DeleteItem(selected_id));
+                        });
+
+                        // select the next available id.
+                        cx.update(|cx| {
+                            selected_id_state.update(cx, move |selected_id, cx| {
+                                let store = ItemStore::global(cx);
+                                *selected_id = SelectedIdState {
+                                    selected_id: store.items().iter().next().map(|(id, _)| *id),
+                                };
+                                cx.notify();
+                            });
+                        });
                     }
                 })
                 .detach();
@@ -470,7 +528,10 @@ impl Render for ListView {
                             .flex()
                             .flex_col()
                             .gap_5(),
-                    ),
+                    )
+                    .context_menu(|menu, _window, _cx| {
+                        menu.menu("Delete Item", Box::new(DeleteItem))
+                    }),
             )
             .child(
                 div()

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use gpui::{App, Global};
+use uuid::Uuid;
 
 pub(crate) struct AppStatus {
     pub(crate) issues: HashMap<AppOperation, Issue>,
@@ -17,9 +18,11 @@ pub(crate) struct Issue {
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, PartialOrd)]
+#[allow(warnings)]
 pub(crate) enum AppOperation {
     CreateNewItem,
     UpdateItem(Field),
+    DeleteItem(Uuid),
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, PartialOrd, Copy, Clone)]
