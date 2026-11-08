@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/out-of-order/oden/compare/oden-v0.16.0...oden-v0.17.0) (2026-11-08)
+
+
+### Features
+
+* **oden-app:** shortcuts for toggle list ([#61](https://github.com/out-of-order/oden/issues/61)) ([ecfb37d](https://github.com/out-of-order/oden/commit/ecfb37dddb3071d56ccd749cc51bbcdf044d709e))
+
 ## [0.16.0](https://github.com/out-of-order/oden/compare/oden-v0.15.0...oden-v0.16.0) (2026-11-05)
 
 
