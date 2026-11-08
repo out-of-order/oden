@@ -10,7 +10,7 @@ use gpui_component::{
 };
 use uuid::Uuid;
 
-use crate::views::graph::GraphView;
+use crate::{actions::ToggleList, views::graph::GraphView};
 use crate::{
     actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
     icons::IconName,
@@ -40,6 +40,8 @@ impl AppRoot {
         let list_view =
             cx.new(|cx| ListView::new(window, cx, cx.focus_handle(), selected_id_state.clone()));
         let show_list = list_view.read(cx).entities.show_list_state.clone();
+        let focus = cx.focus_handle();
+        focus.focus(window, cx);
         Self {
             _state_sub: cx.observe(&app_mode, |_, _, cx| {
                 cx.notify();
@@ -47,9 +49,9 @@ impl AppRoot {
             app_mode: app_mode.clone(),
             list_view,
             graph_view: cx.new(GraphView::new),
-            titlebar: cx.new(|cx| Titlebar::new(cx, window, show_list)),
+            titlebar: cx.new(|cx| Titlebar::new(cx, window, show_list, focus.clone())),
             selected_id_state,
-            focus: cx.focus_handle(),
+            focus,
         }
     }
 
@@ -163,6 +165,7 @@ impl Render for AppRoot {
         let mode = self.app_mode.read(cx);
         div()
             .track_focus(&self.focus)
+            .key_context("ROOT")
             .on_action(cx.listener(|this, _action: &ListMode, _window, cx| {
                 this.update_mode(AppMode::List, cx)
             }))
@@ -177,6 +180,14 @@ impl Render for AppRoot {
             }))
             .on_action(cx.listener(|this, action: &SelectItem, _window, cx| {
                 this.update_selected_id(action.selected_id, cx);
+            }))
+            .on_action(cx.listener(|this, _action: &ToggleList, window, cx| {
+                let show_list_state = this.list_view.read(cx).entities.show_list_state.clone();
+                show_list_state.update(cx, |show_list, _cx| {
+                    *show_list = !*show_list;
+                });
+                this.focus.focus(window, cx);
+                cx.notify();
             }))
             .flex()
             .flex_col()
