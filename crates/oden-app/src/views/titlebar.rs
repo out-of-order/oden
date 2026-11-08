@@ -1,5 +1,5 @@
 use gpui::{
-    AnyElement, AppContext, Context, CursorStyle, Entity, IntoElement, ParentElement, Render,
+    AnyElement, Context, CursorStyle, Entity, FocusHandle, IntoElement, ParentElement, Render,
     SharedString, Styled, Subscription, Window, div,
 };
 use gpui_component::{
@@ -11,6 +11,7 @@ use gpui_component::{
 };
 
 use crate::{
+    actions::ToggleList,
     appstatus::{AppStatus, IssueStatus},
     icons::IconName,
     persistence::{
@@ -24,6 +25,7 @@ pub(crate) struct Titlebar {
     _persistence_sub: Subscription,
     persistence_status: PersistenceStatus,
     show_list: Entity<bool>,
+    focus: FocusHandle,
 }
 
 impl Titlebar {
@@ -31,6 +33,7 @@ impl Titlebar {
         cx: &mut Context<Self>,
         window: &mut Window,
         show_list: Entity<bool>,
+        focus: FocusHandle,
     ) -> Self {
         let _status_entity_sub =
             cx.observe_global_in::<AppStatus>(window, |_status_entity, _window, cx| {
@@ -44,6 +47,7 @@ impl Titlebar {
             _status_entity_sub,
             _persistence_sub,
             show_list,
+            focus,
             persistence_status: PersistenceStatus::Idle,
         }
     }
@@ -115,12 +119,13 @@ impl Render for Titlebar {
         } else {
             (IconName::Close, red)
         };
-        let show_list_entity = self.show_list.clone();
         let show_list_icon = if *self.show_list.read(cx) {
             IconName::ShowList
         } else {
             IconName::HideList
         };
+
+        let focus = self.focus.clone();
         TitleBar::new()
             // render the status of the app.
             .pr_4()
@@ -148,15 +153,13 @@ impl Render for Titlebar {
                         Button::new("toggle_list")
                             .h_3_4()
                             .ghost()
-                            .tooltip("toggle item list")
+                            .tooltip_with_action("toggle item list", &ToggleList, Some("ROOT"))
+                            .on_click(move |_event, window, cx| {
+                                window.focus(&focus, cx);
+                                window.dispatch_action(Box::new(ToggleList), cx);
+                            })
                             .cursor(CursorStyle::PointingHand)
-                            .child(Icon::new(show_list_icon).text_sm().text_color(muted))
-                            .on_click(move |_, _, cx| {
-                                cx.update_entity(&show_list_entity, |show_list, cx| {
-                                    *show_list = !*show_list;
-                                    cx.notify();
-                                })
-                            }),
+                            .child(Icon::new(show_list_icon).text_sm().text_color(muted)),
                     ),
             )
             .child(self.render_persistence(cx))

@@ -33,7 +33,7 @@ impl AssetSource for Assets {
     }
 }
 
-use crate::actions::DeleteItem;
+use crate::actions::{DeleteItem, ToggleList};
 use crate::appstatus::AppStatus;
 use crate::persistence::PersistencePerNote;
 use crate::repository::{
@@ -68,7 +68,10 @@ async fn main() -> anyhow::Result<()> {
             let _ = cx.text_system().add_fonts(vec![Cow::Borrowed(
                 include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf").as_slice(),
             )]);
-            cx.bind_keys([KeyBinding::new("cmd-backspace", DeleteItem, Some("LIST"))]);
+            cx.bind_keys([
+                KeyBinding::new("cmd-backspace", DeleteItem, Some("LIST")),
+                KeyBinding::new("cmd-b", ToggleList, Some("ROOT || LIST")),
+            ]);
             gpui_component::init(cx);
             setup_markdown_language_config(cx);
             AppStatus::init(cx);
