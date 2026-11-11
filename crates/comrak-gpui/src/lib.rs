@@ -11,13 +11,16 @@ use comrak::nodes::NodeValue::{
 use comrak::nodes::{Ast, ListType};
 use comrak::{Arena, Options, parse_document};
 use gpui::{
-    AnyElement, App, Bounds, Corners, Element, ElementId, Font, FontFeatures, FontStyle,
-    FontWeight, GlobalElementId, InspectorElementId, InteractiveText, IntoElement, LayoutId,
-    ParentElement, Pixels, SharedString, Styled, StyledText, TextRun, Window, div, fill, px, rems,
+    AnyElement, App, ElementId, Font, FontFeatures, FontStyle, FontWeight, InteractiveText,
+    IntoElement, ParentElement, SharedString, Styled, StyledText, TextRun, Window, div, px, rems,
 };
 use gpui_component::checkbox::Checkbox;
 use gpui_component::highlighter::SyntaxHighlighter;
 use gpui_component::{ActiveTheme, Rope, Theme};
+
+mod inline_text;
+
+use inline_text::CodeChipText;
 
 thread_local! {
     static CODE_HIGHLIGHTERS: RefCell<HashMap<String, SyntaxHighlighter>> = RefCell::new(HashMap::new());
@@ -183,27 +186,30 @@ where
                 &mut code_spans,
                 theme,
             );
+            if !code_spans.is_empty() {
+                return CodeChipText::new(
+                    text,
+                    runs,
+                    links,
+                    code_spans,
+                    theme.secondary,
+                    theme.border,
+                    theme.radius,
+                    on_link_click.clone(),
+                )
+                .into_any_element();
+            }
             let ranges: Vec<Range<usize>> = links.iter().map(|link| link.range.clone()).collect();
             let styled_text = StyledText::new(text).with_runs(runs);
-            let text_layout = styled_text.layout().clone();
             let on_link_click = on_link_click.clone();
-            let inner = InteractiveText::new(
+            InteractiveText::new(
                 ElementId::Name(SharedString::from("md-paragraph")),
                 styled_text,
             )
             .on_click(ranges, move |index, window, cx| {
                 let link = &links[index];
                 on_link_click(&link.href, cx, window);
-            });
-            CodeChipText {
-                inner,
-                text_layout,
-                code_spans,
-                chip_background: theme.secondary,
-                chip_corner_radius: theme.radius,
-                chip_padding_x: px(3.),
-                chip_padding_y: px(1.),
-            }
+            })
             .into_any_element()
         }
         Text(cow) => {
@@ -428,115 +434,8 @@ fn collect_segments<'a>(
     }
 }
 
+#[derive(Clone)]
 struct LinkSpan {
     range: Range<usize>,
     href: String,
-}
-
-struct CodeChipText {
-    inner: InteractiveText,
-    text_layout: gpui::TextLayout,
-    code_spans: Vec<Range<usize>>,
-    chip_background: gpui::Hsla,
-    chip_corner_radius: Pixels,
-    chip_padding_x: Pixels,
-    chip_padding_y: Pixels,
-}
-
-impl CodeChipText {
-    fn paint_chip(&self, span: &Range<usize>, window: &mut Window) {
-        let Some(start) = self.text_layout.position_for_index(span.start) else {
-            return;
-        };
-        let Some(end) = self.text_layout.position_for_index(span.end) else {
-            return;
-        };
-
-        if start.y != end.y {
-            return;
-        }
-
-        let line_height = self.text_layout.line_height();
-
-        let bounds = Bounds::from_corners(
-            gpui::point(start.x - self.chip_padding_x, start.y - self.chip_padding_y),
-            gpui::point(
-                end.x + self.chip_padding_x,
-                start.y + line_height + self.chip_padding_y,
-            ),
-        );
-
-        window.paint_quad(
-            fill(bounds, self.chip_background).corner_radii(Corners::all(self.chip_corner_radius)),
-        );
-    }
-}
-
-impl Element for CodeChipText {
-    type RequestLayoutState = <InteractiveText as Element>::RequestLayoutState;
-    type PrepaintState = <InteractiveText as Element>::PrepaintState;
-
-    fn id(&self) -> Option<ElementId> {
-        self.inner.id()
-    }
-
-    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-        self.inner.source_location()
-    }
-
-    fn request_layout(
-        &mut self,
-        id: Option<&GlobalElementId>,
-        inspector_id: Option<&InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, Self::RequestLayoutState) {
-        self.inner.request_layout(id, inspector_id, window, cx)
-    }
-
-    fn prepaint(
-        &mut self,
-        id: Option<&GlobalElementId>,
-        inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        request_layout: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Self::PrepaintState {
-        self.inner
-            .prepaint(id, inspector_id, bounds, request_layout, window, cx)
-    }
-
-    fn paint(
-        &mut self,
-        id: Option<&GlobalElementId>,
-        inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        request_layout: &mut Self::RequestLayoutState,
-        prepaint: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        for span in &self.code_spans {
-            self.paint_chip(span, window);
-        }
-
-        self.inner.paint(
-            id,
-            inspector_id,
-            bounds,
-            request_layout,
-            prepaint,
-            window,
-            cx,
-        );
-    }
-}
-
-impl IntoElement for CodeChipText {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
 }
