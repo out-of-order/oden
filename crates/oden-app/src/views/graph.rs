@@ -2,12 +2,12 @@ use crate::store::ItemStore;
 use gpui::{
     Context, Font, FontFeatures, FontStyle, FontWeight, InteractiveElement, MouseButton,
     MouseDownEvent, MouseMoveEvent, MouseUpEvent, PinchEvent, ScrollWheelEvent, ShapedLine,
-    SharedString, Subscription, TextAlign, TextRun, TextSystem,
+    SharedString, Subscription, TextAlign, TextRun, TextSystem, Window,
 };
 use gpui::{ParentElement, Path, PathBuilder, Pixels, Point, canvas};
 use gpui::{Render, Styled, div, px};
 use gpui_component::ActiveTheme;
-use oden_graph::forces::{CollideForce, LinkForce, ManyBodyForce};
+use oden_graph::forces::{CenterForce, CollideForce, LinkForce, ManyBodyForce};
 use oden_graph::simulation;
 use oden_graph::simulation::{Graph, Simulation};
 use std::collections::HashMap;
@@ -26,9 +26,9 @@ pub struct GraphView {
 }
 
 impl GraphView {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>, window: &mut Window) -> Self {
         let simulation = Self::create_simulation_from_store(cx);
-        let _store_sub = cx.observe_global::<ItemStore>(|this, cx| {
+        let _store_sub = cx.observe_global_in::<ItemStore>(window, |this, _window, cx| {
             this.simulation = Self::create_simulation_from_store(cx);
         });
         Self {
@@ -42,7 +42,7 @@ impl GraphView {
         }
     }
 
-    pub fn restart(&mut self, cx: &mut Context<Self>) {
+    pub fn restart(&mut self, cx: &mut Context<Self>, _window: &mut Window) {
         self.simulation = Self::create_simulation_from_store(cx);
         cx.notify();
     }
@@ -84,6 +84,7 @@ impl GraphView {
         Simulation::new(graph)
             .with_force(Box::new(LinkForce::default()))
             .with_force(Box::new(ManyBodyForce::default()))
+            .with_force(Box::new(CenterForce::default()))
             .with_force(Box::new(CollideForce::default()))
     }
 
