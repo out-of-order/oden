@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.5.0...oden-graph-v0.6.0) (2026-11-11)
+
+
+### Features
+
+* **oden-graph:** center force ([#65](https://github.com/out-of-order/oden/issues/65)) ([c7c0b95](https://github.com/out-of-order/oden/commit/c7c0b955f71fc61e8ccff47287ee4c7de3bcfd5e))
+
 ## [0.5.0](https://github.com/out-of-order/oden/compare/oden-graph-v0.4.0...oden-graph-v0.5.0) (2026-10-18)
 
 
