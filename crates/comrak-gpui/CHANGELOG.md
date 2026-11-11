@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.4.0...comrak-gpui-v0.4.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **comrak-gpui:** inline-code blocks ([#63](https://github.com/out-of-order/oden/issues/63)) ([e93a585](https://github.com/out-of-order/oden/commit/e93a5857f087ba3270ba0fb0d29f6660ac7210ec))
+
 ## [0.4.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.3.0...comrak-gpui-v0.4.0) (2026-10-19)
 
 
