@@ -57,9 +57,9 @@ Roadmap before `v1.0.0`. (High level bullet points - Check the issues pages to s
 - [ ] Ensure cross platform support.
 
 **Graph Mode** 
-- [ ] Force directed graph layout.
+- [x] Force directed graph layout.
 - [ ] Graph interactivity. 
-- [ ] Link between items are represented in the graph.
+- [x] Link between items are represented in the graph.
 
 **Search Mode**
 - [ ] Fuzzy finding implemented for all items.
