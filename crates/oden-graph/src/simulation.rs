@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::PI};
+use std::{collections::HashMap, f32::consts::TAU};
 
 use gpui::{Point, SharedString};
 use uuid::Uuid;
@@ -12,7 +12,7 @@ pub struct SimulationOptions {
     pub alpha_decay: f32,
     pub alpha_min: f32,
 
-    // initial radius and angles for position seeding
+    // Circle radius and angular offset in radians for position seeding.
     pub initial_radius: f32,
     pub initial_angle: f32,
 }
@@ -51,7 +51,7 @@ impl Simulation {
             alpha_decay: 0.0228,
             alpha_min: 0.001,
             initial_radius: 50.0,
-            initial_angle: PI * (3.0 - f32::sqrt(5.0)),
+            initial_angle: 0.0,
         };
         let mut simulation = Self {
             options,
@@ -70,14 +70,11 @@ impl Simulation {
     }
 
     pub fn initialize_nodes(&mut self) {
-        let ids: Vec<Uuid> = self.graph.nodes.keys().copied().collect();
-        for (i, id) in ids.iter().enumerate() {
-            // initialize node positions in a spiral
-            let node = self.graph.nodes.get_mut(id).unwrap();
-            let angle = self.options.initial_angle * i as f32;
-            let radius = self.options.initial_radius * (i as f32 + 0.5).sqrt();
-            node.position.x = radius * angle.cos();
-            node.position.y = radius * angle.sin();
+        let node_count = self.graph.nodes.len();
+        for (i, node) in self.graph.nodes.values_mut().enumerate() {
+            let angle = self.options.initial_angle + TAU * i as f32 / node_count as f32;
+            node.position.x = self.options.initial_radius * angle.cos();
+            node.position.y = self.options.initial_radius * angle.sin();
         }
     }
 
@@ -172,10 +169,7 @@ mod tests {
         let simulation = Simulation::new(graph);
         let positions = &simulation.nodes_render_data();
         let node = positions.first().unwrap();
-        assert_eq!(
-            node.1.x,
-            simulation.options.initial_radius * f32::sqrt(2.) / 2.
-        );
+        assert_eq!(node.1.x, simulation.options.initial_radius);
         assert_eq!(node.1.y, 0.)
     }
 

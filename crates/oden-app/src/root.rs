@@ -2,7 +2,7 @@
 
 use gpui::{
     AnyElement, AppContext, Context, Entity, FocusHandle, InteractiveElement, IntoElement,
-    ParentElement, Render, SharedString, Styled, Subscription, div, px,
+    ParentElement, Render, SharedString, Styled, Subscription, Window, div, px,
 };
 use gpui_component::{
     ActiveTheme, Icon,
@@ -48,7 +48,7 @@ impl AppRoot {
             }),
             app_mode: app_mode.clone(),
             list_view,
-            graph_view: cx.new(GraphView::new),
+            graph_view: cx.new(|cx| GraphView::new(cx, window)),
             titlebar: cx.new(|cx| Titlebar::new(cx, window, show_list, focus.clone())),
             selected_id_state,
             focus,
@@ -129,7 +129,7 @@ impl AppRoot {
             )
     }
 
-    fn update_mode(&mut self, mode: AppMode, cx: &mut Context<Self>) {
+    fn update_mode(&mut self, mode: AppMode, window: &mut Window, cx: &mut Context<Self>) {
         let changed = self.app_mode.update(cx, |app_mode, cx| {
             if *app_mode == mode {
                 return false;
@@ -140,7 +140,7 @@ impl AppRoot {
         });
         if changed && mode == AppMode::Graph {
             self.graph_view
-                .update(cx, |graph_view, cx| graph_view.restart(cx));
+                .update(cx, |graph_view, cx| graph_view.restart(cx, window));
         }
     }
 
@@ -166,17 +166,17 @@ impl Render for AppRoot {
         div()
             .track_focus(&self.focus)
             .key_context("ROOT")
-            .on_action(cx.listener(|this, _action: &ListMode, _window, cx| {
-                this.update_mode(AppMode::List, cx)
+            .on_action(cx.listener(|this, _action: &ListMode, window, cx| {
+                this.update_mode(AppMode::List, window, cx)
             }))
-            .on_action(cx.listener(|this, _action: &SearchMode, _window, cx| {
-                this.update_mode(AppMode::Search, cx)
+            .on_action(cx.listener(|this, _action: &SearchMode, window, cx| {
+                this.update_mode(AppMode::Search, window, cx)
             }))
-            .on_action(cx.listener(|this, _action: &GraphMode, _window, cx| {
-                this.update_mode(AppMode::Graph, cx);
+            .on_action(cx.listener(|this, _action: &GraphMode, window, cx| {
+                this.update_mode(AppMode::Graph, window, cx);
             }))
-            .on_action(cx.listener(|this, _action: &Settings, _window, cx| {
-                this.update_mode(AppMode::Settings, cx)
+            .on_action(cx.listener(|this, _action: &Settings, window, cx| {
+                this.update_mode(AppMode::Settings, window, cx)
             }))
             .on_action(cx.listener(|this, action: &SelectItem, _window, cx| {
                 this.update_selected_id(action.selected_id, cx);
