@@ -158,6 +158,31 @@ impl Force for ManyBodyForce {
     }
 }
 
+// ----- Center Force ------
+pub struct CenterForce {
+    pub strength: f32,
+}
+
+impl CenterForce {
+    pub fn new() -> Self {
+        Self { strength: 0.01 }
+    }
+}
+
+impl Default for CenterForce {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Force for CenterForce {
+    fn apply_force(&mut self, alpha: f32, nodes: &mut Graph) {
+        for node in nodes.nodes.values_mut() {
+            node.velocity -= node.position * (self.strength * alpha);
+        }
+    }
+}
+
 // ----- Collide Force ------
 // Keeps nodes from overlapping by treating each one as a circle of
 // `Node::radius` and pushing overlapping pairs apart, equivalent to
