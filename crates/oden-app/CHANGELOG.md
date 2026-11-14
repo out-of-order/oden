@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/out-of-order/oden/compare/oden-v0.18.0...oden-v0.19.0) (2026-11-14)
+
+
+### Features
+
+* add kanagawa theme ([#67](https://github.com/out-of-order/oden/issues/67)) ([ccfc6d5](https://github.com/out-of-order/oden/commit/ccfc6d538d599d9101f244dadf457ae489a19cfb))
+
 ## [0.18.0](https://github.com/out-of-order/oden/compare/oden-v0.17.0...oden-v0.18.0) (2026-11-11)
 
 
