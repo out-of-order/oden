@@ -1,0 +1,147 @@
+{
+  "name": "Kanagawa",
+  "author": "rebelot",
+  "url": "https://github.com/rebelot/kanagawa.nvim",
+  "$schema": "https://github.com/longbridge/gpui-component/raw/refs/heads/main/.theme-schema.json",
+  "themes": [
+    {
+      "name": "Kanagawa Dragon",
+      "mode": "dark",
+      "colors": {
+        "accent.background": "#282727",
+        "accent.foreground": "#c5c9c5",
+        "background": "#181616",
+        "border": "#282727",
+        "window_border": "#393836",
+        "ring": "#8ba4b0",
+        "foreground": "#c5c9c5",
+        "link.active.foreground": "#8ba4b022",
+        "link.foreground": "#8ba4b0",
+        "link.hover.foreground": "#8ba4b0",
+        "list.active.background": "#8ba4b022",
+        "list.active.border": "#8ba4b0",
+        "list.even.background": "#28272799",
+        "muted.background": "#28272744",
+        "muted.foreground": "#a6a69c",
+        "panel.background": "#0d0c0c",
+        "popover.background": "#181616",
+        "popover.foreground": "#c5c9c5",
+        "primary.background": "#8a9a7b",
+        "primary.foreground": "#181616",
+        "scrollbar.background": "#18161600",
+        "scrollbar.thumb.background": "#393836",
+        "secondary.active.background": "#282727",
+        "secondary.background": "#282727",
+        "secondary.foreground": "#c5c9c5",
+        "secondary.hover.background": "#393836",
+        "title_bar.background": "#0d0c0c",
+        "title_bar.border": "#282727",
+        "chart.grid": "#1a1a1a",
+        "base.red": "#c4746e",
+        "base.green": "#8a9a7b",
+        "base.yellow": "#c4b28a",
+        "base.blue": "#8ba4b0",
+        "base.magenta": "#a292a3",
+        "base.cyan": "#8ea4a2"
+      },
+      "highlight": {
+        "editor.foreground": "#c5c9c5",
+        "editor.background": "#181616",
+        "editor.active_line.background": "#282727",
+        "editor.line_number": "#625e5a",
+        "editor.active_line_number": "#c5c9c5",
+        "editor.invisible": "#625e5a66",
+        "conflict": "#c4746e",
+        "created": "#8a9a7b",
+        "deleted": "#c4746e",
+        "error": "#c4746e",
+        "hidden": "#625e5a",
+        "hint": "#8ea4a2",
+        "ignored": "#625e5a",
+        "info": "#8ba4b0",
+        "modified": "#c4b28a",
+        "predictive": "#625e5a",
+        "renamed": "#8ba4b0",
+        "success": "#8a9a7b",
+        "unreachable": "#625e5a",
+        "warning": "#c4b28a",
+        "syntax": {
+          "attribute": {
+            "color": "#c4b28a"
+          },
+          "boolean": {
+            "color": "#b6927b"
+          },
+          "comment": {
+            "color": "#625e5a",
+            "font_style": "italic"
+          },
+          "comment.doc": {
+            "color": "#625e5a",
+            "font_style": "italic"
+          },
+          "constant": {
+            "color": "#b6927b"
+          },
+          "constructor": {
+            "color": "#c4b28a"
+          },
+          "embedded": {
+            "color": "#c5c9c5"
+          },
+          "function": {
+            "color": "#8ba4b0"
+          },
+          "keyword": {
+            "color": "#a292a3"
+          },
+          "link_text": {
+            "color": "#8ea4a2",
+            "font_style": "underline"
+          },
+          "link_uri": {
+            "color": "#8ba4b0",
+            "font_style": "italic"
+          },
+          "number": {
+            "color": "#b6927b"
+          },
+          "string": {
+            "color": "#8a9a7b"
+          },
+          "string.escape": {
+            "color": "#8ea4a2"
+          },
+          "string.regex": {
+            "color": "#8a9a7b"
+          },
+          "string.special": {
+            "color": "#c4b28a"
+          },
+          "string.special.symbol": {
+            "color": "#c4b28a"
+          },
+          "tag": {
+            "color": "#a292a3"
+          },
+          "text.literal": {
+            "color": "#c5c9c5"
+          },
+          "title": {
+            "color": "#8ba4b0",
+            "font_weight": 600
+          },
+          "type": {
+            "color": "#8ea4a2"
+          },
+          "property": {
+            "color": "#c5c9c5"
+          },
+          "variable.special": {
+            "color": "#a292a3"
+          }
+        }
+      }
+    }
+  ]
+}
