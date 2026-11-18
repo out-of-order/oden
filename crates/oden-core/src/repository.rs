@@ -43,6 +43,11 @@ pub trait TitleRepositoryTrait {
 }
 
 #[async_trait]
+pub trait TagsRepositoryTrait {
+    async fn update_tags(&self, id: Uuid, tags: Vec<String>) -> Result<(), UpdateItemError>;
+}
+
+#[async_trait]
 pub trait SyncLinkRepositoryTrait {
     async fn sync_links(&self, from: Uuid, targets: Vec<Uuid>) -> Result<(), SyncLinkError>;
 }
@@ -205,6 +210,22 @@ impl TitleRepositoryTrait for ItemRepository {
         if let Some(item) = item_maybe {
             let mut item: item::ActiveModel = item.into();
             item.name = Set(title);
+            item.modified_at = Set(Utc::now());
+            item.update(&self.db).await?;
+        } else {
+            return Err(UpdateItemError::NotFound);
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl TagsRepositoryTrait for ItemRepository {
+    async fn update_tags(&self, id: Uuid, tags: Vec<String>) -> Result<(), UpdateItemError> {
+        let item_maybe = item::Entity::find_by_id(id).one(&self.db).await?;
+        if let Some(item) = item_maybe {
+            let mut item: item::ActiveModel = item.into();
+            item.tags = Set(json!(tags));
             item.modified_at = Set(Utc::now());
             item.update(&self.db).await?;
         } else {

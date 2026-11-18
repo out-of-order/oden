@@ -37,7 +37,8 @@ use crate::actions::{DeleteItem, ToggleList};
 use crate::appstatus::AppStatus;
 use crate::persistence::PersistencePerNote;
 use crate::repository::{
-    ContentRepository, DeleteItemRepository, ItemRepository, LinkRepository, TitleRepository,
+    ContentRepository, DeleteItemRepository, ItemRepository, LinkRepository, TagsRepository,
+    TitleRepository,
 };
 use crate::state::{AppMode, SelectedIdState};
 use crate::{root::AppRoot, store::ItemStore};
@@ -96,7 +97,8 @@ async fn main() -> anyhow::Result<()> {
                 }
                 ItemRepository::init(cx, ItemRepository(repository.clone()));
                 ContentRepository::init(cx, ContentRepository(repository.clone()));
-                TitleRepository::init(cx, TitleRepository(repository));
+                TitleRepository::init(cx, TitleRepository(repository.clone()));
+                TagsRepository::init(cx, TagsRepository(repository));
                 LinkRepository::init(cx, LinkRepository(link_repository));
                 DeleteItemRepository::init(cx, DeleteItemRepository(delete_item_repository));
                 cx.open_window(window_options, |window, cx| {
