@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/out-of-order/oden/compare/oden-v0.19.0...oden-v0.20.0) (2026-11-19)
+
+
+### Features
+
+* tag implementation ([#69](https://github.com/out-of-order/oden/issues/69)) ([d635da7](https://github.com/out-of-order/oden/commit/d635da79b375d342800b6a8d17cc91a48cd242e8))
+
 ## [0.19.0](https://github.com/out-of-order/oden/compare/oden-v0.18.0...oden-v0.19.0) (2026-11-14)
 
 

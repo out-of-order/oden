@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/out-of-order/oden/compare/oden-core-v0.7.0...oden-core-v0.8.0) (2026-11-19)
+
+
+### Features
+
+* tag implementation ([#69](https://github.com/out-of-order/oden/issues/69)) ([d635da7](https://github.com/out-of-order/oden/commit/d635da79b375d342800b6a8d17cc91a48cd242e8))
+
 ## [0.7.0](https://github.com/out-of-order/oden/compare/oden-core-v0.6.0...oden-core-v0.7.0) (2026-11-05)
 
 
