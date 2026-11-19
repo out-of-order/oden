@@ -49,6 +49,7 @@ struct TextStyle {
 // the mermaid diagram entities in document order.
 struct RenderingContext<'a> {
     in_blockquote: bool,
+    list_depth: usize,
     mermaid_blocks: &'a MermaidBlocks,
 }
 
@@ -78,6 +79,7 @@ pub fn render_document(
     let mermaid_blocks = mermaid_diagrams.sync(&mermaid_sources, cx);
     let render_cx = RenderingContext {
         in_blockquote: false,
+        list_depth: 0,
         mermaid_blocks: &mermaid_blocks,
     };
     render_node(root, cx, render_cx, &on_link_click)
@@ -116,6 +118,41 @@ fn block_for_node(node: &Node<'_, RefCell<Ast>>) -> f32 {
         NodeValue::BlockQuote => 1.0,
         _ => 0.6,
     }
+}
+
+// list_depth is 1-based: the outermost list has depth 1.
+fn bullet_color(list_depth: usize, theme: &Theme) -> gpui::Hsla {
+    let palette = [
+        theme.blue,
+        theme.green,
+        theme.yellow,
+        theme.red,
+        theme.magenta,
+        theme.cyan,
+    ];
+    palette[list_depth.saturating_sub(1) % palette.len()]
+}
+
+fn render_bullet(list_depth: usize, theme: &Theme) -> impl IntoElement {
+    let color = bullet_color(list_depth, theme);
+    // even depths are rings, so levels stay distinguishable without relying on color alone.
+    let circle = if list_depth.is_multiple_of(2) {
+        div()
+            .size(px(6.))
+            .rounded_full()
+            .border_1()
+            .border_color(color)
+    } else {
+        div().size(px(6.)).rounded_full().bg(color)
+    };
+    // the container is as tall as a text line, so the circle centers on the first line
+    // instead of sticking to the top of the row. flex_shrink_0 keeps it round when the text wraps.
+    div()
+        .flex()
+        .items_center()
+        .flex_shrink_0()
+        .h(rems(1.5))
+        .child(circle)
 }
 
 // recursively traverses the AST tree by using the children() method and maps
@@ -299,19 +336,27 @@ where
                 )
                 .into_any_element()
         }
-        List(_) => div()
-            .flex()
-            .flex_col()
-            .children(
-                node.children()
-                    .map(|node| render_node(node, cx, render_cx, on_link_click))
-                    .collect::<Vec<_>>(),
-            )
-            .into_any_element(),
+        List(_) => {
+            let list_render_cx = RenderingContext {
+                list_depth: render_cx.list_depth + 1,
+                ..render_cx
+            };
+            div()
+                .flex()
+                .flex_col()
+                .children(
+                    node.children()
+                        .map(|node| render_node(node, cx, list_render_cx, on_link_click))
+                        .collect::<Vec<_>>(),
+                )
+                .into_any_element()
+        }
         Item(metadata) => {
             let symbol = match metadata.list_type {
-                ListType::Bullet => SharedString::from("•"),
-                ListType::Ordered => SharedString::from(format!("{}.", metadata.start)),
+                ListType::Bullet => render_bullet(render_cx.list_depth, theme).into_any_element(),
+                ListType::Ordered => div()
+                    .child(SharedString::from(format!("{}.", metadata.start)))
+                    .into_any_element(),
             };
             div()
                 .flex()
@@ -468,4 +513,27 @@ fn collect_segments<'a>(
 struct LinkSpan {
     range: Range<usize>,
     href: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bullet_color_changes_per_level_and_wraps() {
+        let theme = Theme {
+            colors: gpui_component::ThemeColor {
+                blue: gpui::hsla(0.6, 1., 0.5, 1.),
+                green: gpui::hsla(0.3, 1., 0.5, 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let palette_len = 6;
+        assert_ne!(bullet_color(1, &theme), bullet_color(2, &theme));
+        assert_eq!(
+            bullet_color(1, &theme),
+            bullet_color(1 + palette_len, &theme)
+        );
+    }
 }

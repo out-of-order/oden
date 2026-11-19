@@ -476,12 +476,6 @@ impl DiagramViewport {
         cx.notify();
     }
 
-    fn zoom_around_center(&mut self, direction: f32, cx: &mut Context<Self>) {
-        let viewport = self.viewport_size();
-        let center = point(viewport.width / 2., viewport.height / 2.);
-        self.set_zoom_at(self.zoom + direction * ZOOM_STEP, center, cx);
-    }
-
     fn local_position(&self, position: Point<Pixels>) -> Point<Pixels> {
         position - self.bounds.borrow().origin
     }
