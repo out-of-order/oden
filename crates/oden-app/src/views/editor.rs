@@ -7,7 +7,7 @@ use crate::models::Item;
 use crate::repository::{ContentRepository, LinkRepository};
 use crate::state::SelectedIdState;
 use crate::store::ItemStore;
-use comrak_gpui::{parse_links, render_document};
+use comrak_gpui::{MermaidDiagrams, parse_links, render_document};
 use gpui::{
     AppContext, Context, Entity, ParentElement, Render, SharedString, Styled, Subscription, Window,
     div, px,
@@ -20,6 +20,7 @@ use uuid::Uuid;
 pub struct EditorView {
     input_state: Entity<EditorState>,
     selected_id_state: Entity<SelectedIdState>,
+    mermaid_diagrams: MermaidDiagrams,
     _selected_id_state_sub: Subscription,
     _input_state_sub: Subscription,
 }
@@ -117,6 +118,7 @@ impl EditorView {
         EditorView {
             input_state,
             selected_id_state,
+            mermaid_diagrams: MermaidDiagrams::default(),
             _input_state_sub,
             _selected_id_state_sub,
         }
@@ -130,8 +132,27 @@ impl EditorView {
 impl Render for EditorView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl gpui::IntoElement {
         let content = self.input_state.read(cx).value();
-        let theme = cx.theme();
         let selected_id_state = self.selected_id_state.clone();
+        let rendered_document = render_document(
+            content.as_ref(),
+            &mut self.mermaid_diagrams,
+            cx,
+            move |href, cx, _window| {
+                if let Some(id) = href.strip_prefix("oden://item/") {
+                    if let Ok(selected_id) = Uuid::parse_str(id) {
+                        selected_id_state.update(cx, |state, cx| {
+                            if state.selected_id != Some(selected_id) {
+                                state.selected_id = Some(selected_id);
+                                cx.notify();
+                            }
+                        });
+                    }
+                } else {
+                    cx.open_url(href);
+                }
+            },
+        );
+        let theme = cx.theme();
         div()
             .flex()
             .flex_row()
@@ -168,24 +189,7 @@ impl Render for EditorView {
                         div()
                             .size_full()
                             .overflow_y_scrollbar()
-                            .child(render_document(
-                                content.as_ref(),
-                                cx,
-                                move |href, cx, _window| {
-                                    if let Some(id) = href.strip_prefix("oden://item/") {
-                                        if let Ok(selected_id) = Uuid::parse_str(id) {
-                                            selected_id_state.update(cx, |state, cx| {
-                                                if state.selected_id != Some(selected_id) {
-                                                    state.selected_id = Some(selected_id);
-                                                    cx.notify();
-                                                }
-                                            });
-                                        }
-                                    } else {
-                                        cx.open_url(href);
-                                    }
-                                },
-                            )),
+                            .child(rendered_document),
                     ),
             )
     }

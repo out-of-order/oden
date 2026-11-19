@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Range;
@@ -19,8 +21,11 @@ use gpui_component::highlighter::SyntaxHighlighter;
 use gpui_component::{ActiveTheme, Rope, Theme};
 
 mod inline_text;
+mod mermaid;
 
 use inline_text::CodeChipText;
+pub use mermaid::MermaidDiagrams;
+use mermaid::{MermaidBlocks, is_mermaid_info};
 
 thread_local! {
     static CODE_HIGHLIGHTERS: RefCell<HashMap<String, SyntaxHighlighter>> = RefCell::new(HashMap::new());
@@ -36,20 +41,23 @@ struct TextStyle {
     strikethrough: Option<gpui::StrikethroughStyle>,
 }
 
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 // a struct to store any context that needs to be
 // passed between parent and child nodes.
-// Now only used for BlockQuote, to change the text color
-// of a paragraph inside a blockquote.
-struct RenderingContext {
+// Used for BlockQuote, to change the text color
+// of a paragraph inside a blockquote, and to hand out
+// the mermaid diagram entities in document order.
+struct RenderingContext<'a> {
     in_blockquote: bool,
+    mermaid_blocks: &'a MermaidBlocks,
 }
 
 /// parses a markdown document using comrak and returns a
 /// renderable gpui element
 pub fn render_document(
     document: &str,
-    cx: &App,
+    mermaid_diagrams: &mut MermaidDiagrams,
+    cx: &mut App,
     on_link_click: impl Fn(&str, &mut App, &mut Window) + 'static,
 ) -> AnyElement {
     let arena = Arena::new();
@@ -57,13 +65,28 @@ pub fn render_document(
     options.extension.tasklist = true;
     let root = parse_document(&arena, document, &options);
     let on_link_click = Rc::new(on_link_click);
-    render_node(root, cx, RenderingContext::default(), &on_link_click)
+    // descendants() is pre-order, the same order render_node visits code blocks in.
+    let mermaid_sources: Vec<SharedString> = root
+        .descendants()
+        .filter_map(|node| match &node.data().value {
+            CodeBlock(code_block) if is_mermaid_info(&code_block.info) => Some(SharedString::from(
+                code_block.literal.trim_end().to_string(),
+            )),
+            _ => None,
+        })
+        .collect();
+    let mermaid_blocks = mermaid_diagrams.sync(&mermaid_sources, cx);
+    let render_cx = RenderingContext {
+        in_blockquote: false,
+        mermaid_blocks: &mermaid_blocks,
+    };
+    render_node(root, cx, render_cx, &on_link_click)
 }
 
 fn render_block_for_children<'a, F>(
     node: &'a Node<'a, RefCell<Ast>>,
     cx: &App,
-    render_context: RenderingContext,
+    render_context: RenderingContext<'_>,
     on_link_click: &Rc<F>,
 ) -> Vec<AnyElement>
 where
@@ -100,7 +123,7 @@ fn block_for_node(node: &Node<'_, RefCell<Ast>>) -> f32 {
 fn render_node<'a, F>(
     node: &'a Node<'a, RefCell<Ast>>,
     cx: &App,
-    render_cx: RenderingContext,
+    render_cx: RenderingContext<'_>,
     on_link_click: &Rc<F>,
 ) -> AnyElement
 where
@@ -216,6 +239,12 @@ where
             let text = cow.as_ref().to_string();
             div().child(text).into_any_element()
         }
+        CodeBlock(code_block) if is_mermaid_info(&code_block.info) => {
+            match render_cx.mermaid_blocks.take_next() {
+                Some(diagram) => diagram.into_any_element(),
+                None => div().into_any_element(),
+            }
+        }
         CodeBlock(code_block) => {
             let literal = &code_block.literal;
             let mut literal = literal.clone();
@@ -254,6 +283,7 @@ where
         BlockQuote => {
             let block_quote_render_cx = RenderingContext {
                 in_blockquote: true,
+                ..render_cx
             };
             div()
                 .flex()
