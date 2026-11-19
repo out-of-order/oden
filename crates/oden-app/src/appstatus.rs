@@ -29,6 +29,7 @@ pub(crate) enum AppOperation {
 pub(crate) enum Field {
     Title,
     Content,
+    Tags,
 }
 
 impl Issue {

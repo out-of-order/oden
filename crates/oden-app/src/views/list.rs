@@ -1,22 +1,27 @@
 use std::sync::Arc;
 
 use gpui::{
-    AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand, Entity,
-    FocusHandle, FontWeight, InteractiveElement, ParentElement, ReadGlobal, Render, SharedString,
-    Styled, Subscription, Window, div, prelude::FluentBuilder, px,
+    AnyElement, App, AppContext, AsyncApp, BorrowAppContext, Context, CursorStyle::PointingHand,
+    Entity, FocusHandle, Focusable, FontWeight, Hsla, InteractiveElement, IntoElement,
+    KeyDownEvent, MouseButton, ParentElement, ReadGlobal, Render, SharedString,
+    StatefulInteractiveElement, Styled, Subscription, Window, deferred, div,
+    prelude::FluentBuilder, px,
 };
 use gpui_base::{Input, InputBase, input::InputEditorStyle};
 use gpui_component::{
     ActiveTheme, Icon, IndexPath, Sizable,
     button::{Button, ButtonVariants},
+    h_flex,
     input::{InputEvent, InputState},
     label::Label,
     list::{List, ListDelegate, ListItem, ListState},
     menu::ContextMenuExt,
+    tag::Tag,
     v_flex,
 };
 use oden_core::errors::PersistenceError;
 use oden_core::repository::{DeleteItemRepositoryTrait, ItemRepositoryTrait};
+use uuid::Uuid;
 
 use crate::{
     ItemStore,
@@ -24,7 +29,8 @@ use crate::{
     appstatus::{AppOperation, AppStatus, Field, Issue},
     icons::IconName,
     inputvaluewatcher::InputPersistence,
-    repository::{DeleteItemRepository, ItemRepository, TitleRepository},
+    persistence::{PersistencePerNote, PersistenceStatus},
+    repository::{DeleteItemRepository, ItemRepository, TagsRepository, TitleRepository},
     state::SelectedIdState,
 };
 use crate::{models::Item, views::editor::EditorView};
@@ -33,6 +39,9 @@ pub(crate) struct ListView {
     _subscriptions: ListSubscriptions,
     pub(crate) focus_handle: FocusHandle,
     pub(crate) entities: ListEntities,
+    editing_tag: Option<usize>,
+    highlighted_suggestion: Option<usize>,
+    suggestions_dismissed: bool,
 }
 
 #[derive(Clone)]
@@ -43,6 +52,7 @@ pub(crate) struct ListEntities {
     selected_id_state: Entity<SelectedIdState>,
     pub(crate) show_list_state: Entity<bool>,
     pub(crate) title_input_state: Entity<InputState>,
+    pub(crate) tags_input_state: Entity<InputState>,
 }
 
 impl ListView {
@@ -59,6 +69,9 @@ impl ListView {
             focus_handle,
             _subscriptions: subscriptions,
             entities,
+            editing_tag: None,
+            highlighted_suggestion: None,
+            suggestions_dismissed: false,
         }
     }
 
@@ -77,6 +90,7 @@ impl ListView {
         let list_state = Self::build_list_state(window, cx, focus_handle.clone());
         let editor = Self::build_editor_view(window, cx, selected_id_state.clone());
         let title_input_state = Self::build_title_input_state(window, cx);
+        let tags_input_state = Self::build_tags_input_state(window, cx);
         let show_list_state = Self::build_show_list_state(cx);
         ListEntities {
             input_state,
@@ -84,6 +98,7 @@ impl ListView {
             list_state,
             selected_id_state,
             title_input_state,
+            tags_input_state,
             show_list_state,
         }
     }
@@ -132,6 +147,17 @@ impl ListView {
     fn build_title_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
         cx.new(|cx| {
             let mut input_state = InputState::new(window, cx);
+            input_state.set_editor_style(InputEditorStyle {
+                caret: cx.theme().caret,
+                ..Default::default()
+            });
+            input_state
+        })
+    }
+
+    fn build_tags_input_state(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputState> {
+        cx.new(|cx| {
+            let mut input_state = InputState::new(window, cx).placeholder("Add tag");
             input_state.set_editor_style(InputEditorStyle {
                 caret: cx.theme().caret,
                 ..Default::default()
@@ -246,10 +272,24 @@ impl ListView {
             },
         );
 
+        let tags_input_state_sub = cx.subscribe_in(
+            &entities.tags_input_state,
+            window,
+            |view, tags_input_state, event: &InputEvent, window, cx| match event {
+                InputEvent::Change => view.commit_comma_separated(tags_input_state, window, cx),
+                InputEvent::PressEnter { .. } => view.commit_tags_input(true, window, cx),
+                InputEvent::Blur => view.commit_tags_input(false, window, cx),
+                InputEvent::Focus => {
+                    view.suggestions_dismissed = false;
+                    cx.notify();
+                }
+            },
+        );
+
         let selected_id_sub = cx.observe_in(
             &entities.selected_id_state,
             window,
-            move |_this, selected_id_state, window, cx| {
+            move |this, selected_id_state, window, cx| {
                 let selected_id = selected_id_state.read(cx).selected_id;
                 let selected_index = {
                     let state = entities.list_state.read(cx);
@@ -259,6 +299,11 @@ impl ListView {
                 };
                 entities.list_state.update(cx, |state, cx| {
                     state.set_selected_index(selected_index, window, cx);
+                });
+                this.editing_tag = None;
+                this.highlighted_suggestion = None;
+                entities.tags_input_state.update(cx, |state, cx| {
+                    state.set_value("", window, cx);
                 });
                 entities.title_input_state.update(cx, |state, cx| {
                     selected_id.inspect(|id| {
@@ -277,6 +322,7 @@ impl ListView {
             _store_sub: store_sub,
             _selected_id_sub: selected_id_sub,
             _title_input_state_sub: title_input_state_sub,
+            _tags_input_state_sub: tags_input_state_sub,
         }
     }
 }
@@ -286,6 +332,7 @@ struct ListSubscriptions {
     _store_sub: Subscription,
     _selected_id_sub: Subscription,
     _title_input_state_sub: Subscription,
+    _tags_input_state_sub: Subscription,
 }
 
 struct ItemListDelegate {
@@ -294,6 +341,28 @@ struct ItemListDelegate {
     selected_index: Option<IndexPath>,
     focus: FocusHandle,
     query: String,
+}
+
+fn tag_color(name: &str, theme: &gpui_component::Theme) -> Hsla {
+    let palette = [
+        theme.blue,
+        theme.green,
+        theme.yellow,
+        theme.red,
+        theme.magenta,
+        theme.cyan,
+    ];
+    let hash = name.bytes().fold(2166136261u32, |hash, byte| {
+        (hash ^ u32::from(byte)).wrapping_mul(16777619)
+    });
+    palette[hash as usize % palette.len()]
+}
+
+fn tag_chip(name: SharedString, theme: &gpui_component::Theme) -> Tag {
+    let color = tag_color(&name, theme);
+    Tag::custom(color.opacity(0.15), color, color.opacity(0.4))
+        .small()
+        .child(name)
 }
 
 fn preview_content(s: SharedString) -> SharedString {
@@ -356,12 +425,25 @@ impl ListDelegate for ItemListDelegate {
                 .border_b(px(1.0))
                 .border_color(border_color)
                 .child(Label::new(item.name.clone()))
-                .child(v_flex().children(vec![
-                    Label::new(item.created_at.date_naive().to_string())
-                        .text_color(date_color)
-                        .text_size(size),
-                    Label::new(preview_content(item.content.clone()))
-                        .text_color(muted_color)]))
+                .child(
+                    v_flex()
+                        .child(
+                            Label::new(item.created_at.date_naive().to_string())
+                                .text_color(date_color)
+                                .text_size(size),
+                        )
+                        .when(!item.tags.is_empty(), |column| {
+                            column.child(
+                                h_flex().gap_1().overflow_hidden().children(
+                                    item.tags.iter().map(|tag| tag_chip(tag.clone(), theme)),
+                                ),
+                            )
+                        })
+                        .child(
+                            Label::new(preview_content(item.content.clone()))
+                                .text_color(muted_color),
+                        ),
+                )
                 .on_click(move |_event, window, cx| {
                     focus.focus(window, cx);
                     let select_item_action = SelectItem { selected_id };
@@ -381,12 +463,353 @@ impl ListDelegate for ItemListDelegate {
     }
 }
 
+impl ListView {
+    fn selected_tags(&self, cx: &App) -> Option<(Uuid, Vec<SharedString>)> {
+        let item_id = self.entities.selected_id_state.read(cx).selected_id?;
+        let item = ItemStore::get(cx).items.get(&item_id)?;
+        Some((item_id, item.tags.clone()))
+    }
+
+    fn tag_suggestions(&self, cx: &App) -> Vec<SharedString> {
+        let Some((_, own_tags)) = self.selected_tags(cx) else {
+            return Vec::new();
+        };
+        let fragment = self
+            .entities
+            .tags_input_state
+            .read(cx)
+            .value()
+            .trim()
+            .to_lowercase();
+        let mut suggestions: Vec<SharedString> = ItemStore::get(cx)
+            .items
+            .values()
+            .flat_map(|item| item.tags.iter())
+            .filter(|tag| !own_tags.contains(tag))
+            .filter(|tag| tag.to_lowercase().contains(&fragment))
+            .cloned()
+            .collect();
+        suggestions.sort();
+        suggestions.dedup();
+        suggestions
+    }
+
+    fn apply_tags(&mut self, item_id: Uuid, tags: Vec<SharedString>, cx: &mut Context<Self>) {
+        let changed =
+            cx.update_global::<ItemStore, bool>(|store, _cx| match store.items.get_mut(&item_id) {
+                Some(item) if item.tags != tags => {
+                    item.tags = tags.clone();
+                    true
+                }
+                _ => false,
+            });
+        if changed {
+            Self::persist_tags(cx, item_id, &tags);
+        }
+        cx.notify();
+    }
+
+    fn persist_tags(cx: &mut Context<Self>, item_id: Uuid, tags: &[SharedString]) {
+        let repository = cx.global::<TagsRepository>().0.clone();
+        let tags_to_save: Vec<String> = tags.iter().map(|tag| tag.to_string()).collect();
+        cx.update_global::<PersistencePerNote, ()>(|persistence_per_note, _cx| {
+            persistence_per_note
+                .0
+                .insert((item_id, Field::Tags), PersistenceStatus::Saving);
+        });
+        cx.spawn(async move |_this, cx| {
+            let result = repository.update_tags(item_id, tags_to_save).await;
+            cx.update(|cx| match result {
+                Ok(()) => {
+                    cx.update_global::<PersistencePerNote, ()>(|persistence, _cx| {
+                        persistence
+                            .0
+                            .insert((item_id, Field::Tags), PersistenceStatus::Idle);
+                    });
+                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
+                        app_status
+                            .issues
+                            .remove(&AppOperation::UpdateItem(Field::Tags));
+                    });
+                }
+                Err(error) => {
+                    cx.update_global::<PersistencePerNote, ()>(|persistence, _cx| {
+                        persistence
+                            .0
+                            .insert((item_id, Field::Tags), PersistenceStatus::Failed);
+                    });
+                    cx.update_global::<AppStatus, ()>(|app_status, _cx| {
+                        app_status.issues.insert(
+                            AppOperation::UpdateItem(Field::Tags),
+                            Issue::new(error.to_string()),
+                        );
+                    });
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn commit_tag_text(&mut self, text: &str, remove_if_empty: bool, cx: &mut Context<Self>) {
+        let editing = self.editing_tag.take();
+        self.highlighted_suggestion = None;
+        let Some((item_id, mut tags)) = self.selected_tags(cx) else {
+            return;
+        };
+        let text = text.trim();
+        let editing = editing.filter(|index| *index < tags.len());
+        match (editing, text.is_empty()) {
+            (Some(index), true) if remove_if_empty => {
+                tags.remove(index);
+            }
+            (_, true) => {}
+            (Some(index), false) => {
+                let duplicate = tags
+                    .iter()
+                    .enumerate()
+                    .any(|(other, tag)| other != index && tag.as_ref() == text);
+                if duplicate {
+                    tags.remove(index);
+                } else {
+                    tags[index] = SharedString::from(text.to_string());
+                }
+            }
+            (None, false) => {
+                if !tags.iter().any(|tag| tag.as_ref() == text) {
+                    tags.push(SharedString::from(text.to_string()));
+                }
+            }
+        }
+        self.apply_tags(item_id, tags, cx);
+    }
+
+    fn clear_tags_input(&self, window: &mut Window, cx: &mut Context<Self>) {
+        self.entities.tags_input_state.update(cx, |state, cx| {
+            state.set_value("", window, cx);
+        });
+    }
+
+    fn commit_tags_input(&mut self, explicit: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if explicit {
+            let suggestions = self.tag_suggestions(cx);
+            if let Some(suggestion) = self
+                .highlighted_suggestion
+                .and_then(|index| suggestions.get(index))
+            {
+                self.pick_suggestion(suggestion.clone(), window, cx);
+                return;
+            }
+        }
+        let text = self.entities.tags_input_state.read(cx).value().to_string();
+        self.commit_tag_text(&text, explicit, cx);
+        if !text.is_empty() {
+            self.clear_tags_input(window, cx);
+        }
+        cx.notify();
+    }
+
+    fn commit_comma_separated(
+        &mut self,
+        tags_input_state: &Entity<InputState>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.highlighted_suggestion = None;
+        self.suggestions_dismissed = false;
+        let value = tags_input_state.read(cx).value().to_string();
+        if !value.contains(',') {
+            cx.notify();
+            return;
+        }
+        let mut segments: Vec<&str> = value.split(',').collect();
+        let remainder = segments.pop().unwrap_or_default().trim_start().to_string();
+        for segment in segments {
+            self.commit_tag_text(segment, false, cx);
+        }
+        tags_input_state.update(cx, |state, cx| {
+            state.set_value(remainder, window, cx);
+        });
+    }
+
+    fn pick_suggestion(&mut self, tag: SharedString, window: &mut Window, cx: &mut Context<Self>) {
+        self.commit_tag_text(&tag, false, cx);
+        self.clear_tags_input(window, cx);
+        self.focus_tags_input(window, cx);
+    }
+
+    fn begin_edit_tag(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((_, tags)) = self.selected_tags(cx) else {
+            return;
+        };
+        let Some(tag) = tags.get(index) else {
+            return;
+        };
+        self.editing_tag = Some(index);
+        self.highlighted_suggestion = None;
+        let text = tag.clone();
+        self.entities.tags_input_state.update(cx, |state, cx| {
+            state.set_value(text, window, cx);
+        });
+        self.focus_tags_input(window, cx);
+        cx.notify();
+    }
+
+    fn focus_tags_input(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let focus_handle = self.entities.tags_input_state.read(cx).focus_handle(cx);
+        focus_handle.focus(window, cx);
+    }
+
+    fn handle_tags_key_down(
+        &mut self,
+        event: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let suggestions_count = self.tag_suggestions(cx).len();
+        match event.keystroke.key.as_str() {
+            "down" if suggestions_count > 0 => {
+                self.highlighted_suggestion = Some(
+                    self.highlighted_suggestion
+                        .map_or(0, |index| (index + 1) % suggestions_count),
+                );
+                cx.notify();
+            }
+            "up" if suggestions_count > 0 => {
+                self.highlighted_suggestion = Some(
+                    self.highlighted_suggestion
+                        .map_or(suggestions_count - 1, |index| {
+                            (index + suggestions_count - 1) % suggestions_count
+                        }),
+                );
+                cx.notify();
+            }
+            "escape" => {
+                self.suggestions_dismissed = true;
+                self.editing_tag = None;
+                self.highlighted_suggestion = None;
+                self.clear_tags_input(window, cx);
+                cx.notify();
+            }
+            "backspace" => {
+                let input_is_empty = self.entities.tags_input_state.read(cx).value().is_empty();
+                if input_is_empty
+                    && self.editing_tag.is_none()
+                    && let Some((_, tags)) = self.selected_tags(cx)
+                    && let Some(last_index) = tags.len().checked_sub(1)
+                {
+                    self.begin_edit_tag(last_index, window, cx);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn render_tags_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let Some((_, tags)) = self.selected_tags(cx) else {
+            return div().into_any_element();
+        };
+        let suggestions = self.tag_suggestions(cx);
+        let input_focused = self
+            .entities
+            .tags_input_state
+            .read(cx)
+            .focus_handle(cx)
+            .is_focused(window);
+        let show_suggestions =
+            input_focused && !self.suggestions_dismissed && !suggestions.is_empty();
+        let theme = cx.theme();
+        let (popover_background, border_color, highlight_color) =
+            (theme.popover, theme.border, theme.accent);
+
+        let dropdown = v_flex()
+            .absolute()
+            .top_full()
+            .left_0()
+            .mt_1()
+            .overflow_hidden()
+            .gap_1()
+            .p_1()
+            .rounded_md()
+            .border_1()
+            .border_color(border_color)
+            .bg(popover_background)
+            .shadow_md()
+            .children(suggestions.iter().cloned().enumerate().map(|(index, tag)| {
+                let is_highlighted = self.highlighted_suggestion == Some(index);
+                div()
+                    .id(SharedString::from(format!("tag-suggestion-{index}")))
+                    .cursor(PointingHand)
+                    .p_1()
+                    .rounded_sm()
+                    .when(is_highlighted, |element| element.bg(highlight_color))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener({
+                            let tag = tag.clone();
+                            move |this, _event, window, cx| {
+                                this.pick_suggestion(tag.clone(), window, cx);
+                            }
+                        }),
+                    )
+                    .child(tag_chip(tag, cx.theme()))
+            }));
+
+        let tags_input = div()
+            .relative()
+            .w(px(160.0))
+            .child(
+                InputBase::new("tags-input")
+                    .child(Input::new(&self.entities.tags_input_state))
+                    .text_sm(),
+            )
+            .when(show_suggestions, |element| {
+                element.child(deferred(dropdown).with_priority(1))
+            })
+            .into_any_element();
+
+        let mut tags_input = Some(tags_input);
+        let mut elements: Vec<AnyElement> = Vec::new();
+        for (index, tag) in tags.iter().enumerate() {
+            if self.editing_tag == Some(index) {
+                elements.extend(tags_input.take());
+                continue;
+            }
+            elements.push(
+                div()
+                    .id(SharedString::from(format!("tag-{index}")))
+                    .cursor(PointingHand)
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.begin_edit_tag(index, window, cx);
+                    }))
+                    .child(tag_chip(tag.clone(), cx.theme()))
+                    .into_any_element(),
+            );
+        }
+        elements.extend(tags_input);
+
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .items_center()
+            .gap_1()
+            .px_2()
+            .pb_1()
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                this.handle_tags_key_down(event, window, cx);
+            }))
+            .children(elements)
+            .into_any_element()
+    }
+}
+
 impl Render for ListView {
     fn render(
         &mut self,
-        _window: &mut gpui::Window,
+        window: &mut gpui::Window,
         cx: &mut gpui::Context<Self>,
     ) -> impl gpui::IntoElement {
+        let tags_editor = self.render_tags_editor(window, cx);
         let theme = cx.theme();
         let border_color = theme.border;
         let muted_color = theme.muted_foreground;
@@ -549,6 +972,7 @@ impl Render for ListView {
                             .text_color(cx.theme().primary)
                             .border_color(cx.theme().border),
                     )
+                    .child(tags_editor)
                     .child(div().flex_1().min_h_0().child(self.entities.editor.clone())),
             )
     }
@@ -559,15 +983,16 @@ mod tests {
     use std::sync::Arc;
 
     use crate::actions::{NewItem, SelectItem};
-    use crate::repository::{ItemRepository, TitleRepository};
+    use crate::repository::{ItemRepository, TagsRepository, TitleRepository};
     use crate::store::ItemStore;
     use crate::testutils::setup;
     use async_trait::async_trait;
     use chrono::Utc;
+    use gpui::Focusable;
     use gpui::{SharedString, TestAppContext};
     use oden_core::entities::item;
     use oden_core::errors::UpdateItemError;
-    use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
+    use oden_core::repository::{ItemRepositoryTrait, TagsRepositoryTrait, TitleRepositoryTrait};
     use sea_orm::DbErr;
     use serde_json::json;
     use tokio::sync::watch;
@@ -601,6 +1026,118 @@ mod tests {
         async fn update_title(&self, _id: Uuid, _title: String) -> Result<(), UpdateItemError> {
             Ok(())
         }
+    }
+
+    #[async_trait]
+    impl TagsRepositoryTrait for MockItemRepository {
+        async fn update_tags(&self, _id: Uuid, _tags: Vec<String>) -> Result<(), UpdateItemError> {
+            Ok(())
+        }
+    }
+
+    #[gpui::test]
+    fn test_tags_input_commit_edit_and_remove(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
+        cx.update(|cx| {
+            cx.set_global(TagsRepository(Arc::new(MockItemRepository)));
+        });
+        let target_id = cx.update(|cx| {
+            ItemStore::get(cx)
+                .items
+                .keys()
+                .next()
+                .copied()
+                .expect("item store should contain one item")
+        });
+        cx.update(|cx| {
+            if let Some(item) = ItemStore::get_mut(cx).items.get_mut(&target_id) {
+                item.tags.clear();
+            }
+        });
+        window
+            .update(cx, |root, window, cx| {
+                root.focus.focus(window, cx);
+                window.dispatch_action(
+                    Box::new(SelectItem {
+                        selected_id: target_id,
+                    }),
+                    cx,
+                );
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        let type_tag = |cx: &mut TestAppContext, text: &str| {
+            window
+                .update(cx, |root, window, cx| {
+                    let tags_input_state =
+                        root.list_view.read(cx).entities.tags_input_state.clone();
+                    let focus_handle = tags_input_state.read(cx).focus_handle(cx);
+                    focus_handle.focus(window, cx);
+                    tags_input_state.update(cx, |state, cx| {
+                        state.replace_all(text, window, cx);
+                    });
+                })
+                .unwrap();
+            cx.dispatch_keystroke(
+                *window,
+                gpui::Keystroke::parse("enter").expect("valid keystroke"),
+            );
+            cx.run_until_parked();
+        };
+        let stored_tags = |cx: &mut TestAppContext| -> Vec<String> {
+            cx.update(|cx| {
+                ItemStore::get(cx)
+                    .items
+                    .get(&target_id)
+                    .map(|item| item.tags.iter().map(|tag| tag.to_string()).collect())
+                    .unwrap_or_default()
+            })
+        };
+
+        type_tag(cx, "alpha");
+        type_tag(cx, "beta");
+        assert_eq!(stored_tags(cx), vec!["alpha", "beta"]);
+
+        window
+            .update(cx, |root, window, cx| {
+                root.list_view.update(cx, |view, cx| {
+                    view.begin_edit_tag(0, window, cx);
+                });
+            })
+            .unwrap();
+        type_tag(cx, "gamma");
+        assert_eq!(stored_tags(cx), vec!["gamma", "beta"]);
+
+        window
+            .update(cx, |root, window, cx| {
+                root.list_view.update(cx, |view, cx| {
+                    view.begin_edit_tag(1, window, cx);
+                });
+            })
+            .unwrap();
+        type_tag(cx, "");
+        assert_eq!(stored_tags(cx), vec!["gamma"]);
+
+        window
+            .update(cx, |root, window, cx| {
+                root.list_view.update(cx, |view, cx| {
+                    view.suggestions_dismissed = false;
+                    view.focus_tags_input(window, cx);
+                });
+            })
+            .unwrap();
+        cx.dispatch_keystroke(
+            *window,
+            gpui::Keystroke::parse("escape").expect("valid keystroke"),
+        );
+        cx.run_until_parked();
+        let dismissed = window
+            .update(cx, |root, _window, cx| {
+                root.list_view.read(cx).suggestions_dismissed
+            })
+            .unwrap();
+        assert!(dismissed);
     }
 
     #[gpui::test]

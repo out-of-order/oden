@@ -3,18 +3,20 @@ use std::sync::Arc;
 use gpui::{AsyncApp, Global};
 use oden_core::repository::{
     ContentRepositoryTrait, DeleteItemRepositoryTrait, ItemRepositoryTrait,
-    SyncLinkRepositoryTrait, TitleRepositoryTrait,
+    SyncLinkRepositoryTrait, TagsRepositoryTrait, TitleRepositoryTrait,
 };
 
 pub struct ItemRepository(pub Arc<dyn ItemRepositoryTrait + Send + Sync>);
 pub struct ContentRepository(pub Arc<dyn ContentRepositoryTrait + Send + Sync>);
 pub struct TitleRepository(pub Arc<dyn TitleRepositoryTrait + Send + Sync>);
+pub struct TagsRepository(pub Arc<dyn TagsRepositoryTrait + Send + Sync>);
 pub struct LinkRepository(pub Arc<dyn SyncLinkRepositoryTrait + Send + Sync>);
 pub struct DeleteItemRepository(pub Arc<dyn DeleteItemRepositoryTrait + Send + Sync>);
 
 impl Global for ItemRepository {}
 impl Global for ContentRepository {}
 impl Global for TitleRepository {}
+impl Global for TagsRepository {}
 impl Global for LinkRepository {}
 impl Global for DeleteItemRepository {}
 
@@ -54,6 +56,14 @@ impl TitleRepository {
     pub fn init(cx: &mut AsyncApp, title: TitleRepository) {
         cx.update(move |cx| {
             cx.set_global(title);
+        })
+    }
+}
+
+impl TagsRepository {
+    pub fn init(cx: &mut AsyncApp, tags: TagsRepository) {
+        cx.update(move |cx| {
+            cx.set_global(tags);
         })
     }
 }

@@ -47,6 +47,8 @@ impl InputPersistence {
             match updated_field {
                 Field::Title => store.title_input_tx.insert(item_id, tx),
                 Field::Content => store.item_content_tx.insert(item_id, tx),
+                // Tags are saved on Enter, without a debounced watch channel.
+                Field::Tags => None,
             };
         });
         let (error_tx, mut error_rx) = tokio::sync::mpsc::unbounded_channel::<PersistenceError>();
