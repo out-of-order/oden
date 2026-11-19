@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.4.1...comrak-gpui-v0.5.0) (2026-11-19)
+
+
+### Features
+
+* add mermaid diagrams ([aec4182](https://github.com/out-of-order/oden/commit/aec418284f277619a91a0ea49ab771818e8bac6c))
+
 ## [0.4.1](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.4.0...comrak-gpui-v0.4.1) (2026-11-11)
 
 

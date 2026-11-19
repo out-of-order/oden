@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/out-of-order/oden/compare/oden-v0.20.0...oden-v0.21.0) (2026-11-19)
+
+
+### Features
+
+* add mermaid diagrams ([aec4182](https://github.com/out-of-order/oden/commit/aec418284f277619a91a0ea49ab771818e8bac6c))
+
 ## [0.20.0](https://github.com/out-of-order/oden/compare/oden-v0.19.0...oden-v0.20.0) (2026-11-19)
 
 
