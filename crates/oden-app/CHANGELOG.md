@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/out-of-order/oden/compare/oden-v0.22.0...oden-v0.23.0) (2026-11-20)
+
+
+### Features
+
+* add fraction-based sync srolling ([#73](https://github.com/out-of-order/oden/issues/73)) ([9fb86c3](https://github.com/out-of-order/oden/commit/9fb86c3e3a1db3aa8c438f4193d0f7b68a5fd2df))
+
 ## [0.22.0](https://github.com/out-of-order/oden/compare/oden-v0.21.0...oden-v0.22.0) (2026-11-20)
 
 
