@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.5.0...comrak-gpui-v0.6.0) (2026-11-20)
+
+
+### Features
+
+* add depth context to list ([90e3cb2](https://github.com/out-of-order/oden/commit/90e3cb238c32d13c2a66ca2da71499ded435e5eb))
+
 ## [0.5.0](https://github.com/out-of-order/oden/compare/comrak-gpui-v0.4.1...comrak-gpui-v0.5.0) (2026-11-19)
 
 
