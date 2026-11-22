@@ -2,7 +2,10 @@ use gpui::Action;
 use gpui::actions;
 use uuid::Uuid;
 
-actions!(iconRail, [ListMode, SearchMode, GraphMode, Settings]);
+actions!(
+    iconRail,
+    [ListMode, SearchMode, GraphMode, Settings, IssueLogs]
+);
 actions!(listMode, [NewItem, DeleteItem]);
 actions!(root, [ToggleList]);
 

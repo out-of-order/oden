@@ -12,10 +12,10 @@ use uuid::Uuid;
 
 use crate::{actions::ToggleList, views::graph::GraphView};
 use crate::{
-    actions::{self, GraphMode, ListMode, SearchMode, SelectItem, Settings},
+    actions::{self, GraphMode, IssueLogs, ListMode, SearchMode, SelectItem, Settings},
     icons::IconName,
     state::{AppMode, SelectedIdState},
-    views::{list::ListView, titlebar::Titlebar},
+    views::{issuelogs::IssueLogsView, list::ListView, titlebar::Titlebar},
 };
 
 const APP_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
@@ -26,6 +26,7 @@ pub struct AppRoot {
     pub(crate) titlebar: Entity<Titlebar>,
     pub(crate) list_view: Entity<ListView>,
     pub(crate) graph_view: Entity<GraphView>,
+    pub(crate) issue_logs_view: Entity<IssueLogsView>,
     pub(crate) focus: FocusHandle,
     pub(crate) _state_sub: Subscription,
 }
@@ -49,6 +50,7 @@ impl AppRoot {
             app_mode: app_mode.clone(),
             list_view,
             graph_view: cx.new(|cx| GraphView::new(cx, window)),
+            issue_logs_view: cx.new(|cx| IssueLogsView::new(cx, window)),
             titlebar: cx.new(|cx| Titlebar::new(cx, window, show_list, focus.clone())),
             selected_id_state,
             focus,
@@ -67,6 +69,7 @@ impl AppRoot {
                     AppMode::Search => window.dispatch_action(Box::new(actions::SearchMode), cx),
                     AppMode::Settings => window.dispatch_action(Box::new(actions::Settings), cx),
                     AppMode::Graph => window.dispatch_action(Box::new(actions::GraphMode), cx),
+                    AppMode::IssueLogs => window.dispatch_action(Box::new(actions::IssueLogs), cx),
                 }
             })
             .tooltip(tooltip)
@@ -175,6 +178,9 @@ impl Render for AppRoot {
             .on_action(cx.listener(|this, _action: &GraphMode, window, cx| {
                 this.update_mode(AppMode::Graph, window, cx);
             }))
+            .on_action(cx.listener(|this, _action: &IssueLogs, window, cx| {
+                this.update_mode(AppMode::IssueLogs, window, cx)
+            }))
             .on_action(cx.listener(|this, _action: &Settings, window, cx| {
                 this.update_mode(AppMode::Settings, window, cx)
             }))
@@ -215,6 +221,7 @@ impl AppRoot {
         match mode {
             AppMode::List => self.list_view.clone().into_any_element(),
             AppMode::Graph => self.graph_view.clone().into_any_element(),
+            AppMode::IssueLogs => self.issue_logs_view.clone().into_any_element(),
             _ => SharedString::from(mode.to_string()).into_any_element(),
         }
     }

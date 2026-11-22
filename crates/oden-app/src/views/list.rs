@@ -822,13 +822,19 @@ impl Render for ListView {
                 let selected_id_state = this.entities.selected_id_state.clone();
                 let repository = cx.global::<ItemRepository>().0.clone();
                 cx.spawn(async move |_this, cx| {
-                    if let Err(err) = Self::add_empty_item(cx, repository, selected_id_state).await
-                    {
-                        cx.update_global::<AppStatus, ()>(|state, _cx| {
-                            let new_issue = Issue::new(err.to_string());
-                            state.issues.insert(AppOperation::CreateNewItem, new_issue);
-                        });
-                        eprintln!("failed to add item: {err}");
+                    match Self::add_empty_item(cx, repository, selected_id_state).await {
+                        Ok(()) => {
+                            cx.update_global::<AppStatus, ()>(|state, _cx| {
+                                state.issues.remove(&AppOperation::CreateNewItem);
+                            });
+                        }
+                        Err(err) => {
+                            cx.update_global::<AppStatus, ()>(|state, _cx| {
+                                let new_issue = Issue::new(err.to_string());
+                                state.issues.insert(AppOperation::CreateNewItem, new_issue);
+                            });
+                            eprintln!("failed to add item: {err}");
+                        }
                     }
                 })
                 .detach();

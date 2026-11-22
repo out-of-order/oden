@@ -11,8 +11,8 @@ use gpui_component::{
 };
 
 use crate::{
-    actions::ToggleList,
-    appstatus::{AppStatus, IssueStatus},
+    actions::{IssueLogs, ToggleList},
+    appstatus::AppStatus,
     icons::IconName,
     persistence::{
         PersistencePerNote,
@@ -102,11 +102,7 @@ impl Render for Titlebar {
         let green = cx.theme().green_light;
         let red = cx.theme().red_light;
         let status_entity = cx.global::<AppStatus>();
-        let total_issues_found: usize = status_entity
-            .issues
-            .iter()
-            .filter(|issue| issue.1.issue_status == IssueStatus::Open)
-            .count();
+        let total_issues_found = status_entity.open_issue_count();
         let issue_label = if total_issues_found == 1 {
             "issue"
         } else {
@@ -138,8 +134,14 @@ impl Render for Titlebar {
                     .child(
                         Button::new("issues")
                             .cursor(CursorStyle::PointingHand)
-                            // TODO: Navigate to a file showing all the issues.
                             .tooltip("check issue logs")
+                            .on_click({
+                                let focus = focus.clone();
+                                move |_event, window, cx| {
+                                    window.focus(&focus, cx);
+                                    window.dispatch_action(Box::new(IssueLogs), cx);
+                                }
+                            })
                             .h_3_4()
                             .ghost()
                             .flex()
@@ -169,8 +171,10 @@ impl Render for Titlebar {
 #[cfg(test)]
 mod tests {
     use crate::appstatus::Field;
+    use chrono::Utc;
     use std::assert_matches;
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use gpui::{BorrowAppContext, TestAppContext};
     use oden_core::repository::{ItemRepositoryTrait, TitleRepositoryTrait};
@@ -181,7 +185,11 @@ mod tests {
     use crate::appstatus::AppStatus;
     use crate::persistence::{PersistencePerNote, PersistenceStatus};
     use crate::repository::{ItemRepository, TitleRepository};
-    use crate::{actions::NewItem, testutils::setup};
+    use crate::state::AppMode;
+    use crate::{
+        actions::{IssueLogs, NewItem},
+        testutils::setup,
+    };
 
     use async_trait::async_trait;
 
@@ -235,6 +243,106 @@ mod tests {
                     issue.message,
                     "Custom Error: an error occurred when inserting an item"
                 );
+            })
+            .unwrap();
+    }
+
+    #[gpui::test]
+    fn test_issue_logs_show_open_issues(cx: &mut TestAppContext) {
+        let (window, app_mode_state, _selected_id_state) = setup(cx);
+        cx.update(|cx| {
+            cx.set_global::<ItemRepository>(ItemRepository(Arc::new(FailingItemRepository {})));
+        });
+        window
+            .update(cx, |root, window, cx| {
+                let focus_handle = { root.list_view.read(cx).focus_handle.clone() };
+                focus_handle.focus(window, cx);
+                window.dispatch_action(Box::new(NewItem), cx);
+            })
+            .unwrap();
+        cx.run_until_parked();
+        window
+            .update(cx, |root, window, cx| {
+                root.focus.focus(window, cx);
+                window.dispatch_action(Box::new(IssueLogs), cx);
+            })
+            .unwrap();
+        cx.run_until_parked();
+
+        cx.update(|cx| assert_eq!(*app_mode_state.read(cx), AppMode::IssueLogs));
+        window
+            .update(cx, |root, _window, cx| {
+                let log = root.issue_logs_view.read(cx).input_state.read(cx).value();
+                assert!(log.starts_with('['), "log should be timestamped: {log}");
+                assert!(log.contains(
+                    "create item: Custom Error: an error occurred when inserting an item"
+                ));
+            })
+            .unwrap();
+    }
+
+    struct FlakyItemRepository {
+        remaining_failures: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl ItemRepositoryTrait for FlakyItemRepository {
+        async fn find_all(&self) -> Result<Vec<item::Model>, DbErr> {
+            Ok(vec![])
+        }
+
+        async fn create_item(&self) -> Result<item::Model, DbErr> {
+            if self
+                .remaining_failures
+                .try_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                return Err(DbErr::Custom("database is locked".into()));
+            }
+            let now = Utc::now();
+            Ok(item::Model {
+                id: Uuid::from_u128(7),
+                name: "".into(),
+                content: "".into(),
+                kind: item::ItemKind::Note,
+                tags: serde_json::json!([]),
+                language: None,
+                created_at: now,
+                modified_at: now,
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn test_issue_is_cleared_once_operation_succeeds(cx: &mut TestAppContext) {
+        let (window, _app_mode_state, _selected_id_state) = setup(cx);
+        cx.update(|cx| {
+            cx.set_global::<ItemRepository>(ItemRepository(Arc::new(FlakyItemRepository {
+                remaining_failures: AtomicUsize::new(1),
+            })));
+        });
+        for expected_open_issues in [1, 0] {
+            window
+                .update(cx, |root, window, cx| {
+                    let focus_handle = { root.list_view.read(cx).focus_handle.clone() };
+                    focus_handle.focus(window, cx);
+                    window.dispatch_action(Box::new(NewItem), cx);
+                })
+                .unwrap();
+            cx.run_until_parked();
+            cx.update(|cx| {
+                assert_eq!(
+                    cx.global::<AppStatus>().open_issue_count(),
+                    expected_open_issues
+                );
+            });
+        }
+        window
+            .update(cx, |root, _window, cx| {
+                let log = root.issue_logs_view.read(cx).input_state.read(cx).value();
+                assert_eq!(log.as_ref(), "No unresolved issues");
             })
             .unwrap();
     }

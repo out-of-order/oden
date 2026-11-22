@@ -8,6 +8,7 @@ pub enum AppMode {
     List,
     Graph,
     Settings,
+    IssueLogs,
 }
 
 pub struct SelectedIdState {
@@ -27,6 +28,7 @@ impl std::fmt::Display for AppMode {
             AppMode::List => "List",
             AppMode::Graph => "Graph",
             AppMode::Settings => "Settings",
+            AppMode::IssueLogs => "Issue Logs",
         };
         write!(f, "{}", s)
     }

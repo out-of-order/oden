@@ -51,15 +51,23 @@ impl InputPersistence {
                 Field::Tags => None,
             };
         });
-        let (error_tx, mut error_rx) = tokio::sync::mpsc::unbounded_channel::<PersistenceError>();
+        let (outcome_tx, mut outcome_rx) =
+            tokio::sync::mpsc::unbounded_channel::<Result<(), PersistenceError>>();
         cx.spawn(async move |_this, cx| {
-            while let Some(error_value) = error_rx.recv().await {
+            while let Some(outcome) = outcome_rx.recv().await {
                 cx.update(|cx| {
                     cx.update_global::<AppStatus, ()>(|app_status, _cx| {
-                        app_status.issues.insert(
-                            AppOperation::UpdateItem(updated_field),
-                            Issue::new(error_value.to_string()),
-                        );
+                        let operation = AppOperation::UpdateItem(updated_field);
+                        match outcome {
+                            Ok(()) => {
+                                app_status.issues.remove(&operation);
+                            }
+                            Err(error) => {
+                                app_status
+                                    .issues
+                                    .insert(operation, Issue::new(error.to_string()));
+                            }
+                        }
                     })
                 });
             }
@@ -79,17 +87,17 @@ impl InputPersistence {
             }
         })
         .detach();
-        InputValueWatcher::spawn(rx, error_tx, persistence_tx, save);
+        InputValueWatcher::spawn(rx, outcome_tx, persistence_tx, save);
     }
 }
 
 impl InputValueWatcher {
     /// Applies a debounce logic to an input,
-    /// Publishes eventual error to an error channel
+    /// Publishes the outcome of each save to an outcome channel
     /// Published persistence state to a persistence channel.
     fn spawn<F>(
         mut rx: Receiver<SharedString>,
-        error_tx: UnboundedSender<PersistenceError>,
+        outcome_tx: UnboundedSender<Result<(), PersistenceError>>,
         persistence_state_tx: UnboundedSender<PersistenceStatus>,
         save: F,
     ) where
@@ -115,7 +123,9 @@ impl InputValueWatcher {
                 let value = rx.borrow_and_update().clone();
                 match save(value).await {
                     Ok(()) => {
-                        if persistence_state_tx.send(PersistenceStatus::Idle).is_err() {
+                        if persistence_state_tx.send(PersistenceStatus::Idle).is_err()
+                            || outcome_tx.send(Ok(())).is_err()
+                        {
                             return;
                         };
                     }
@@ -123,7 +133,7 @@ impl InputValueWatcher {
                         if persistence_state_tx
                             .send(PersistenceStatus::Failed)
                             .is_err()
-                            || error_tx.send(e).is_err()
+                            || outcome_tx.send(Err(e)).is_err()
                         {
                             return;
                         }
