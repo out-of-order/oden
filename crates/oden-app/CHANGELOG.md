@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/out-of-order/oden/compare/oden-v0.23.0...oden-v0.24.0) (2026-11-22)
+
+
+### Features
+
+* **oden-app:** add issuelogs view ([44678b9](https://github.com/out-of-order/oden/commit/44678b9481309440fbe80081a2fbd791533c553a))
+
 ## [0.23.0](https://github.com/out-of-order/oden/compare/oden-v0.22.0...oden-v0.23.0) (2026-11-20)
 
 
